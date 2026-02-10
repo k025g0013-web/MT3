@@ -81,9 +81,9 @@ Matrix4x4 MakeScaleMatrix(const Vector3 &scale) {
 Vector3 Transform(const Vector3 &vector, const Matrix4x4 &matrix) {
 	Vector3 result = {};
 
-	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[0][1] + vector.z * matrix.m[0][2] + matrix.m[0][3];
-	result.y = vector.x * matrix.m[1][0] + vector.y * matrix.m[1][1] + vector.z * matrix.m[1][2] + matrix.m[1][3];
-	result.z = vector.x * matrix.m[2][0] + vector.y * matrix.m[2][1] + vector.z * matrix.m[2][2] + matrix.m[2][3];
+	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + matrix.m[3][0];
+	result.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + matrix.m[3][1];
+	result.z = vector.x * matrix.m[0][2] + vector.y * matrix.m[1][2] + vector.z * matrix.m[2][2] + matrix.m[3][2];
 
 	float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] + vector.z * matrix.m[2][3] + matrix.m[3][3];
 	assert(w != 0.0f);
@@ -105,6 +105,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
+	// 変数の初期化
+	Vector3 translate{ 4.1f, 2.6f, 0.8f };
+	Vector3 scale{ 1.5f, 5.2f, 7.3f };
+	Vector3 point{ 2.3f, 3.8f, 1.4f };
+	Matrix4x4 transformMatrix = {
+		1.0f, 2.0f, 3.0f, 4.0f,
+		3.0f, 1.0f, 1.0f, 2.0f,
+		1.0f, 4.0f, 2.0f, 3.0f,
+		2.0f, 2.0f, 1.0f, 3.0f
+	};
+
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
 		// フレームの開始
@@ -113,17 +124,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// キー入力を受け取る
 		memcpy(preKeys, keys, 256);
 		Novice::GetHitKeyStateAll(keys);
-
-		// 変数の初期化
-		Vector3 translate{ 4.1f, 2.6f, 0.8f };
-		Vector3 scale{ 1.5f, 5.2f, 7.3f };
-		Vector3 point{ 2.3f, 3.8f, 1.4f };
-		Matrix4x4 transformMatrix = {
-			1.0f, 2.0f, 3.0f, 4.0f,
-			3.0f, 1.0f, 1.0f, 2.0f,
-			1.0f, 4.0f, 2.0f, 3.0f,
-			2.0f, 2.0f, 1.0f, 3.0f
-		};
 
 		///
 		/// ↓更新処理ここから
