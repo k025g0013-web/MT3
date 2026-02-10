@@ -1,5 +1,5 @@
 #include <Novice.h>
-#include <cmath>
+#include <math.h>
 #include <cassert>
 
 const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_01_00_確認課題";
@@ -23,6 +23,14 @@ struct Matrix4x4 {
 
 static const int kRowHeight = 20;
 static const int kColumnWidth = 60;
+
+void VectorScreenPrintf(int x, int y, const Vector3 &vector, const char *label) {
+	Novice::ScreenPrintf(x, y, "%.02f", vector.x);
+	Novice::ScreenPrintf(x + kColumnWidth, y, "%.02f", vector.y);
+	Novice::ScreenPrintf(x + kColumnWidth * 2, y, "%.02f", vector.z);
+	Novice::ScreenPrintf(x + kColumnWidth * 3, y, "%s", label);
+}
+
 
 void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 	Novice::ScreenPrintf(x, y, "%s", label);
@@ -100,9 +108,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	char preKeys[256] = { 0 };
 
 	// 変数の初期化
-	Vector3 scale{1.2f, 0.79f, -2.1f};
-	Vector3 rotate{0.4f, 1.43f, -0.8f};
-	Vector3 transform{2.7f, -4.15f, 1.57f};
+	Vector3 translate{ 4.1f, 2.6f, 0.8f };
+	Vector3 scale{ 1.5f, 5.2f, 7.3f };
+	Vector3 point{ 2.3f, 3.8f, 1.4f };
+	Matrix4x4 transformMatrix = {
+		1.0f, 2.0f, 3.0f, 4.0f,
+		3.0f, 1.0f, 1.0f, 2.0f,
+		1.0f, 4.0f, 2.0f, 3.0f,
+		2.0f, 2.0f, 1.0f, 3.0f
+	};
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
