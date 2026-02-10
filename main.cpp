@@ -2,7 +2,7 @@
 #include <cmath>
 #include <cassert>
 
-const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_00_05_確認課題";
+const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_01_00_確認課題";
 
 // 行列
 //=========================
@@ -41,32 +41,51 @@ void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 #pragma endregion
 
 #pragma region 計算関数
-Matrix4x4 MakeAffineMatrix(Vector3 &scale, Vector3 &rotation, Vector3 &translation) {
-	// アフィン変換行列の作成
-	Matrix4x4 affineMatrix = {};
+// 透視投影行列
+Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip) {
+	Matrix4x4 result = {};
 
-	for (int i = 0; i < 4; i++) {
-		affineMatrix.m[i][i] = 1.0f;
-	}
+	float fov = 1.0f / tanf(fovY / 2.0f);
 
-	// アフィン変換行列
-	affineMatrix.m[0][0] = scale.x * (cos(rotation.y) * cos(rotation.z));
-	affineMatrix.m[0][1] = scale.x * (cos(rotation.y) * sin(rotation.z));
-	affineMatrix.m[0][2] = scale.x * (-sin(rotation.y));
+	result.m[0][0] = fov / aspectRatio;
+	result.m[1][1] = fov;
+	result.m[2][2] = farClip / (farClip - nearClip);
+	result.m[2][3] = 1.0f;
+	result.m[3][2] = (-nearClip * farClip) / (farClip - nearClip);
 
-	affineMatrix.m[1][0] = scale.y * (sin(rotation.x) * sin(rotation.y) * cos(rotation.z) - cos(rotation.x) * sin(rotation.z));
-	affineMatrix.m[1][1] = scale.y * (sin(rotation.x) * sin(rotation.y) * sin(rotation.z) + cos(rotation.x) * cos(rotation.z));
-	affineMatrix.m[1][2] = scale.y * (sin(rotation.x) * cos(rotation.y));
+	return result;
+};
 
-	affineMatrix.m[2][0] = scale.z * (cos(rotation.x) * sin(rotation.y) * cos(rotation.z) + sin(rotation.x) * sin(rotation.z));
-	affineMatrix.m[2][1] = scale.z * (cos(rotation.x) * sin(rotation.y) * sin(rotation.z) - sin(rotation.x) * cos(rotation.z));
-	affineMatrix.m[2][2] = scale.z * (cos(rotation.x) * cos(rotation.y));
+// 正射影行列
+Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float bottom, float nearClip, float farClip) {
+	Matrix4x4 result = {};
 
-	affineMatrix.m[3][0] = translation.x;
-	affineMatrix.m[3][1] = translation.y;
-	affineMatrix.m[3][2] = translation.z;
+	result.m[0][0] = 2.0f / (right - left);
+	result.m[1][1] = 2.0f / (top - bottom);
+	result.m[2][2] = 1.0f / (farClip - nearClip);
+	result.m[3][3] = 1.0f;
 
-	return affineMatrix;
+	result.m[3][0] = -(right + left) / (right - left);
+	result.m[3][1] = -(top + bottom) / (top - bottom);
+	result.m[3][2] = -nearClip / (farClip - nearClip);
+
+	return result;
+};
+
+// ビューポート変換行列
+Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, float minDepth, float maxDepth) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = width / 2.0f;
+	result.m[1][1] = -height / 2.0f;
+	result.m[2][2] = maxDepth - minDepth;
+	result.m[3][3] = 1.0f;
+
+	result.m[3][0] = left + width / 2.0f;
+	result.m[3][1] = top + height / 2.0f;
+	result.m[3][2] = minDepth;
+
+	return result;
 };
 #pragma endregion
 
@@ -98,7 +117,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓更新処理ここから
 		///
 
-		Matrix4x4 worldMatrix = MakeAffineMatrix(scale, rotate, transform);
+		Matrix4x4 orthographicMatrix = 
+			MakeOrthographicMatrix(-160.0f, 160.0f, 200.0f, 300.0f, 0.0f, 1000.0f);
+		Matrix4x4 perspectiveFovMatrix = 
+			MakePerspectiveFovMatrix(0.63f, 1.33f, 0.1f, 1000.0f);
+		Matrix4x4 viewportMatrix = 
+			MakeViewportMatrix(100.0f, 200.0f, 600.0f, 300.0f, 0.0f, 1.0f);
 
 		///
 		/// ↑更新処理ここまで
@@ -108,7 +132,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		MatrixScreenPrintf(0, 0, worldMatrix, "worldMatrix");
+		MatrixScreenPrintf(0, 0, orthographicMatrix, "orthographicMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5, perspectiveFovMatrix, "orthographicMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 10, viewportMatrix, "viewportMatrix");
 		
 		///
 		/// ↑描画処理ここまで
