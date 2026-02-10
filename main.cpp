@@ -2,7 +2,7 @@
 #include <math.h>
 #include <cassert>
 
-const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_00_03_確認課題";
+const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_00_04_確認課題";
 
 // 行列
 //=========================
