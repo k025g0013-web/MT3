@@ -2,7 +2,7 @@
 #include <math.h>
 #include <cassert>
 
-const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_00_04_確認課題";
+const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_01_00_確認課題";
 
 // 行列
 //=========================
@@ -49,50 +49,52 @@ void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 #pragma endregion
 
 #pragma region 計算関数
-// 平行移動行列
-Matrix4x4 MakeTranslateMatrix(const Vector3 &translate) {
+// 透視投影行列
+Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip) {
 	Matrix4x4 result = {};
 
-	// 単位行列にする
-	for (int i = 0; i < 4; ++i) {
-		result.m[i][i] = 1.0f;
-	}
+	float fov = 1.0f / tanf(fovY / 2.0f);
 
-	result.m[3][0] = translate.x;
-	result.m[3][1] = translate.y;
-	result.m[3][2] = translate.z;
+	result.m[0][0] = fov / aspectRatio;
+	result.m[1][1] = fov;
+	result.m[2][2] = farClip / (farClip - nearClip);
+	result.m[2][3] = 1.0f;
+	result.m[3][2] = (-nearClip * farClip) / (farClip - nearClip);
 
 	return result;
-}
+};
 
-// 拡大縮小行列
-Matrix4x4 MakeScaleMatrix(const Vector3 &scale) {
+// 正射影行列
+Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float bottom, float nearClip, float farClip) {
 	Matrix4x4 result = {};
 
-	result.m[0][0] = scale.x;
-	result.m[1][1] = scale.y;
-	result.m[2][2] = scale.z;
+	result.m[0][0] = 2.0f / (right - left);
+	result.m[1][1] = 2.0f / (top - bottom);
+	result.m[2][2] = 1.0f / (farClip - nearClip);
 	result.m[3][3] = 1.0f;
 
-	return result;
-}
-
-// 座標変換
-Vector3 Transform(const Vector3 &vector, const Matrix4x4 &matrix) {
-	Vector3 result = {};
-
-	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + matrix.m[3][0];
-	result.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + matrix.m[3][1];
-	result.z = vector.x * matrix.m[0][2] + vector.y * matrix.m[1][2] + vector.z * matrix.m[2][2] + matrix.m[3][2];
-
-	float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] + vector.z * matrix.m[2][3] + matrix.m[3][3];
-	assert(w != 0.0f);
-	result.x /= w;
-	result.y /= w;
-	result.z /= w;
+	result.m[3][0] = -(right + left) / (right - left);
+	result.m[3][1] = -(top + bottom) / (top - bottom);
+	result.m[3][2] = -nearClip / (farClip - nearClip);
 
 	return result;
-}
+};
+
+// ビューポート変換行列
+Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, float minDepth, float maxDepth) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = width / 2.0f;
+	result.m[1][1] = -height / 2.0f;
+	result.m[2][2] = maxDepth - minDepth;
+	result.m[3][3] = 1.0f;
+
+	result.m[3][0] = left + width / 2.0f;
+	result.m[3][1] = top + height / 2.0f;
+	result.m[3][2] = minDepth;
+
+	return result;
+};
 #pragma endregion
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -129,9 +131,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓更新処理ここから
 		///
 
-		Matrix4x4 translateMatrix = MakeTranslateMatrix(translate);
-		Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
-		Vector3 transformed = Transform(point, transformMatrix);
+		Matrix4x4 orthographicMatrix = 
+			MakeOrthographicMatrix(-160.0f, 160.0f, 200.0f, 300.0f, 0.0f, 1000.0f);
+		Matrix4x4 perspectiveFovMatrix = 
+			MakePerspectiveFovMatrix(0.63f, 1.33f, 0.1f, 1000.0f);
+		Matrix4x4 viewportMatrix = 
+			MakeViewportMatrix(100.0f, 200.0f, 600.0f, 300.0f, 0.0f, 1.0f);
 
 		///
 		/// ↑更新処理ここまで
@@ -141,15 +146,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		// 平行移動
-		VectorScreenPrintf(0, 0, transformed, "transformed");
-
-		// 拡大縮小
-		MatrixScreenPrintf(0, kRowHeight, translateMatrix, "translateMatrix");
-
-		// 座標変換
-		MatrixScreenPrintf(0, kRowHeight * 6, scaleMatrix, "scaleMatrix");
-
+		MatrixScreenPrintf(0, 0, orthographicMatrix, "orthographicMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5, perspectiveFovMatrix, "orthographicMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 10, viewportMatrix, "viewportMatrix");
+		
 		///
 		/// ↑描画処理ここまで
 		///
