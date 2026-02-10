@@ -2,7 +2,7 @@
 #include <cmath>
 #include <cassert>
 
-const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_00_03_確認課題";
+const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_00_05_確認課題";
 
 // 行列
 //=========================
@@ -41,77 +41,33 @@ void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 #pragma endregion
 
 #pragma region 計算関数
-// x軸回転行列
-Matrix4x4 MakeRotateXMatrix(float radian) {
-	Matrix4x4 result = {};
+Matrix4x4 MakeAffineMatrix(Vector3 &scale, Vector3 &rotation, Vector3 &translation) {
+	// アフィン変換行列の作成
+	Matrix4x4 affineMatrix = {};
 
-	result.m[0][0] = 1.0f; 
-	result.m[1][1] = cosf(radian);
-	result.m[1][2] = sinf(radian);
-	
-	result.m[2][1] = -sinf(radian);
-	result.m[2][2] = cosf(radian);
-	result.m[3][3] = 1.0f;
+	for (int i = 0; i < 4; i++) {
+		affineMatrix.m[i][i] = 1.0f;
+	}
 
-	return result;
+	// アフィン変換行列
+	affineMatrix.m[0][0] = scale.x * (cos(rotation.y) * cos(rotation.z));
+	affineMatrix.m[0][1] = scale.x * (cos(rotation.y) * sin(rotation.z));
+	affineMatrix.m[0][2] = scale.x * (-sin(rotation.y));
+
+	affineMatrix.m[1][0] = scale.y * (sin(rotation.x) * sin(rotation.y) * cos(rotation.z) - cos(rotation.x) * sin(rotation.z));
+	affineMatrix.m[1][1] = scale.y * (sin(rotation.x) * sin(rotation.y) * sin(rotation.z) + cos(rotation.x) * cos(rotation.z));
+	affineMatrix.m[1][2] = scale.y * (sin(rotation.x) * cos(rotation.y));
+
+	affineMatrix.m[2][0] = scale.z * (cos(rotation.x) * sin(rotation.y) * cos(rotation.z) + sin(rotation.x) * sin(rotation.z));
+	affineMatrix.m[2][1] = scale.z * (cos(rotation.x) * sin(rotation.y) * sin(rotation.z) - sin(rotation.x) * cos(rotation.z));
+	affineMatrix.m[2][2] = scale.z * (cos(rotation.x) * cos(rotation.y));
+
+	affineMatrix.m[3][0] = translation.x;
+	affineMatrix.m[3][1] = translation.y;
+	affineMatrix.m[3][2] = translation.z;
+
+	return affineMatrix;
 };
-
-// y軸回転行列
-Matrix4x4 MakeRotateYMatrix(float radian) {
-	Matrix4x4 result = {};
-
-	result.m[0][0] = cosf(radian);
-	result.m[0][2] = -sinf(radian);
-	result.m[1][1] = 1.0f;
-	result.m[2][0] = sinf(radian);
-	result.m[2][2] = cosf(radian);
-	result.m[3][3] = 1.0f;
-
-	return result;
-};
-
-// z軸回転行列
-Matrix4x4 MakeRotateZMatrix(float radian) {
-	Matrix4x4 result = {};
-
-	result.m[0][0] = cosf(radian);
-	result.m[0][1] = sinf(radian);
-	result.m[1][0] = -sinf(radian);
-	result.m[1][1] = cosf(radian);
-	result.m[2][2] = 1.0f;
-	result.m[3][3] = 1.0f;
-
-	return result;
-};
-
-
-Matrix4x4 Multiply(const Matrix4x4 &matrix1, const Matrix4x4 &matrix2) {
-	Matrix4x4 result{};
-
-	result.m[0][0] = matrix1.m[0][0] * matrix2.m[0][0] + matrix1.m[0][1] * matrix2.m[1][0] + matrix1.m[0][2] * matrix2.m[2][0] + matrix1.m[0][3] * matrix2.m[3][0];
-	result.m[0][1] = matrix1.m[0][0] * matrix2.m[0][1] + matrix1.m[0][1] * matrix2.m[1][1] + matrix1.m[0][2] * matrix2.m[2][1] + matrix1.m[0][3] * matrix2.m[3][1];
-	result.m[0][2] = matrix1.m[0][0] * matrix2.m[0][2] + matrix1.m[0][1] * matrix2.m[1][2] + matrix1.m[0][2] * matrix2.m[2][2] + matrix1.m[0][3] * matrix2.m[3][2];
-	result.m[0][3] = matrix1.m[0][0] * matrix2.m[0][3] + matrix1.m[0][1] * matrix2.m[1][3] + matrix1.m[0][2] * matrix2.m[2][3] + matrix1.m[0][3] * matrix2.m[3][3];
-
-	result.m[1][0] = matrix1.m[1][0] * matrix2.m[0][0] + matrix1.m[1][1] * matrix2.m[1][0] + matrix1.m[1][2] * matrix2.m[2][0] + matrix1.m[1][3] * matrix2.m[3][0];
-	result.m[1][1] = matrix1.m[1][0] * matrix2.m[0][1] + matrix1.m[1][1] * matrix2.m[1][1] + matrix1.m[1][2] * matrix2.m[2][1] + matrix1.m[1][3] * matrix2.m[3][1];
-	result.m[1][2] = matrix1.m[1][0] * matrix2.m[0][2] + matrix1.m[1][1] * matrix2.m[1][2] + matrix1.m[1][2] * matrix2.m[2][2] + matrix1.m[1][3] * matrix2.m[3][2];
-	result.m[1][3] = matrix1.m[1][0] * matrix2.m[0][3] + matrix1.m[1][1] * matrix2.m[1][3] + matrix1.m[1][2] * matrix2.m[2][3] + matrix1.m[1][3] * matrix2.m[3][3];
-
-	result.m[2][0] = matrix1.m[2][0] * matrix2.m[0][0] + matrix1.m[2][1] * matrix2.m[1][0] + matrix1.m[2][2] * matrix2.m[2][0] + matrix1.m[2][3] * matrix2.m[3][0];
-	result.m[2][1] = matrix1.m[2][0] * matrix2.m[0][1] + matrix1.m[2][1] * matrix2.m[1][1] + matrix1.m[2][2] * matrix2.m[2][1] + matrix1.m[2][3] * matrix2.m[3][1];
-	result.m[2][2] = matrix1.m[2][0] * matrix2.m[0][2] + matrix1.m[2][1] * matrix2.m[1][2] + matrix1.m[2][2] * matrix2.m[2][2] + matrix1.m[2][3] * matrix2.m[3][2];
-	result.m[2][3] = matrix1.m[2][0] * matrix2.m[0][3] + matrix1.m[2][1] * matrix2.m[1][3] + matrix1.m[2][2] * matrix2.m[2][3] + matrix1.m[2][3] * matrix2.m[3][3];
-
-	result.m[3][0] = matrix1.m[3][0] * matrix2.m[0][0] + matrix1.m[3][1] * matrix2.m[1][0] + matrix1.m[3][2] * matrix2.m[2][0] + matrix1.m[3][3] * matrix2.m[3][0];
-	result.m[3][1] = matrix1.m[3][0] * matrix2.m[0][1] + matrix1.m[3][1] * matrix2.m[1][1] + matrix1.m[3][2] * matrix2.m[2][1] + matrix1.m[3][3] * matrix2.m[3][1];
-	result.m[3][2] = matrix1.m[3][0] * matrix2.m[0][2] + matrix1.m[3][1] * matrix2.m[1][2] + matrix1.m[3][2] * matrix2.m[2][2] + matrix1.m[3][3] * matrix2.m[3][2];
-	result.m[3][3] = matrix1.m[3][0] * matrix2.m[0][3] + matrix1.m[3][1] * matrix2.m[1][3] + matrix1.m[3][2] * matrix2.m[2][3] + matrix1.m[3][3] * matrix2.m[3][3];
-
-	return result;
-}
-
-
 #pragma endregion
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -125,7 +81,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	char preKeys[256] = { 0 };
 
 	// 変数の初期化
-	Vector3 rotate{ 0.4f, 1.43f, -0.8f };
+	Vector3 scale{1.2f, 0.79f, -2.1f};
+	Vector3 rotate{0.4f, 1.43f, -0.8f};
+	Vector3 transform{2.7f, -4.15f, 1.57f};
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -140,10 +98,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓更新処理ここから
 		///
 
-		Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
-		Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
-		Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
-		Matrix4x4 rotateXYZMatrix = Multiply(rotateXMatrix, Multiply(rotateYMatrix, rotateZMatrix));
+		Matrix4x4 worldMatrix = MakeAffineMatrix(scale, rotate, transform);
 
 		///
 		/// ↑更新処理ここまで
@@ -153,11 +108,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		MatrixScreenPrintf(0, 0, rotateXMatrix, "rotateXMatrix");
-		MatrixScreenPrintf(0, kRowHeight * 5, rotateYMatrix, "rotateYMatrix");
-		MatrixScreenPrintf(0, kRowHeight * 5 * 2, rotateZMatrix, "rotateZMatrix");
-		MatrixScreenPrintf(0, kRowHeight * 5 * 3, rotateXYZMatrix, "rotateXYZMatrix");
-
+		MatrixScreenPrintf(0, 0, worldMatrix, "worldMatrix");
+		
 		///
 		/// ↑描画処理ここまで
 		///
