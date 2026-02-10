@@ -1,5 +1,5 @@
 #include <Novice.h>
-#include <math.h>
+#include <cmath>
 #include <cassert>
 
 const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_00_03_確認課題";
@@ -24,14 +24,6 @@ struct Matrix4x4 {
 static const int kRowHeight = 20;
 static const int kColumnWidth = 60;
 
-void VectorScreenPrintf(int x, int y, const Vector3 &vector, const char *label) {
-	Novice::ScreenPrintf(x, y, "%.02f", vector.x);
-	Novice::ScreenPrintf(x + kColumnWidth, y, "%.02f", vector.y);
-	Novice::ScreenPrintf(x + kColumnWidth * 2, y, "%.02f", vector.z);
-	Novice::ScreenPrintf(x + kColumnWidth * 3, y, "%s", label);
-}
-
-
 void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 	Novice::ScreenPrintf(x, y, "%s", label);
 
@@ -49,50 +41,77 @@ void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 #pragma endregion
 
 #pragma region 計算関数
-// 平行移動行列
-Matrix4x4 MakeTranslateMatrix(const Vector3 &translate) {
+// x軸回転行列
+Matrix4x4 MakeRotateXMatrix(float radian) {
 	Matrix4x4 result = {};
 
-	// 単位行列にする
-	for (int i = 0; i < 4; ++i) {
-		result.m[i][i] = 1.0f;
-	}
-
-	result.m[3][0] = translate.x;
-	result.m[3][1] = translate.y;
-	result.m[3][2] = translate.z;
-
-	return result;
-}
-
-// 拡大縮小行列
-Matrix4x4 MakeScaleMatrix(const Vector3 &scale) {
-	Matrix4x4 result = {};
-
-	result.m[0][0] = scale.x;
-	result.m[1][1] = scale.y;
-	result.m[2][2] = scale.z;
+	result.m[0][0] = 1.0f; 
+	result.m[1][1] = cosf(radian);
+	result.m[1][2] = sinf(radian);
+	
+	result.m[2][1] = -sinf(radian);
+	result.m[2][2] = cosf(radian);
 	result.m[3][3] = 1.0f;
 
 	return result;
-}
+};
 
-// 座標変換
-Vector3 Transform(const Vector3 &vector, const Matrix4x4 &matrix) {
-	Vector3 result = {};
+// y軸回転行列
+Matrix4x4 MakeRotateYMatrix(float radian) {
+	Matrix4x4 result = {};
 
-	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[0][1] + vector.z * matrix.m[0][2] + matrix.m[0][3];
-	result.y = vector.x * matrix.m[1][0] + vector.y * matrix.m[1][1] + vector.z * matrix.m[1][2] + matrix.m[1][3];
-	result.z = vector.x * matrix.m[2][0] + vector.y * matrix.m[2][1] + vector.z * matrix.m[2][2] + matrix.m[2][3];
+	result.m[0][0] = cosf(radian);
+	result.m[0][2] = -sinf(radian);
+	result.m[1][1] = 1.0f;
+	result.m[2][0] = sinf(radian);
+	result.m[2][2] = cosf(radian);
+	result.m[3][3] = 1.0f;
 
-	float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] + vector.z * matrix.m[2][3] + matrix.m[3][3];
-	assert(w != 0.0f);
-	result.x /= w;
-	result.y /= w;
-	result.z /= w;
+	return result;
+};
+
+// z軸回転行列
+Matrix4x4 MakeRotateZMatrix(float radian) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = cosf(radian);
+	result.m[0][1] = sinf(radian);
+	result.m[1][0] = -sinf(radian);
+	result.m[1][1] = cosf(radian);
+	result.m[2][2] = 1.0f;
+	result.m[3][3] = 1.0f;
+
+	return result;
+};
+
+
+Matrix4x4 Multiply(const Matrix4x4 &matrix1, const Matrix4x4 &matrix2) {
+	Matrix4x4 result{};
+
+	result.m[0][0] = matrix1.m[0][0] * matrix2.m[0][0] + matrix1.m[0][1] * matrix2.m[1][0] + matrix1.m[0][2] * matrix2.m[2][0] + matrix1.m[0][3] * matrix2.m[3][0];
+	result.m[0][1] = matrix1.m[0][0] * matrix2.m[0][1] + matrix1.m[0][1] * matrix2.m[1][1] + matrix1.m[0][2] * matrix2.m[2][1] + matrix1.m[0][3] * matrix2.m[3][1];
+	result.m[0][2] = matrix1.m[0][0] * matrix2.m[0][2] + matrix1.m[0][1] * matrix2.m[1][2] + matrix1.m[0][2] * matrix2.m[2][2] + matrix1.m[0][3] * matrix2.m[3][2];
+	result.m[0][3] = matrix1.m[0][0] * matrix2.m[0][3] + matrix1.m[0][1] * matrix2.m[1][3] + matrix1.m[0][2] * matrix2.m[2][3] + matrix1.m[0][3] * matrix2.m[3][3];
+
+	result.m[1][0] = matrix1.m[1][0] * matrix2.m[0][0] + matrix1.m[1][1] * matrix2.m[1][0] + matrix1.m[1][2] * matrix2.m[2][0] + matrix1.m[1][3] * matrix2.m[3][0];
+	result.m[1][1] = matrix1.m[1][0] * matrix2.m[0][1] + matrix1.m[1][1] * matrix2.m[1][1] + matrix1.m[1][2] * matrix2.m[2][1] + matrix1.m[1][3] * matrix2.m[3][1];
+	result.m[1][2] = matrix1.m[1][0] * matrix2.m[0][2] + matrix1.m[1][1] * matrix2.m[1][2] + matrix1.m[1][2] * matrix2.m[2][2] + matrix1.m[1][3] * matrix2.m[3][2];
+	result.m[1][3] = matrix1.m[1][0] * matrix2.m[0][3] + matrix1.m[1][1] * matrix2.m[1][3] + matrix1.m[1][2] * matrix2.m[2][3] + matrix1.m[1][3] * matrix2.m[3][3];
+
+	result.m[2][0] = matrix1.m[2][0] * matrix2.m[0][0] + matrix1.m[2][1] * matrix2.m[1][0] + matrix1.m[2][2] * matrix2.m[2][0] + matrix1.m[2][3] * matrix2.m[3][0];
+	result.m[2][1] = matrix1.m[2][0] * matrix2.m[0][1] + matrix1.m[2][1] * matrix2.m[1][1] + matrix1.m[2][2] * matrix2.m[2][1] + matrix1.m[2][3] * matrix2.m[3][1];
+	result.m[2][2] = matrix1.m[2][0] * matrix2.m[0][2] + matrix1.m[2][1] * matrix2.m[1][2] + matrix1.m[2][2] * matrix2.m[2][2] + matrix1.m[2][3] * matrix2.m[3][2];
+	result.m[2][3] = matrix1.m[2][0] * matrix2.m[0][3] + matrix1.m[2][1] * matrix2.m[1][3] + matrix1.m[2][2] * matrix2.m[2][3] + matrix1.m[2][3] * matrix2.m[3][3];
+
+	result.m[3][0] = matrix1.m[3][0] * matrix2.m[0][0] + matrix1.m[3][1] * matrix2.m[1][0] + matrix1.m[3][2] * matrix2.m[2][0] + matrix1.m[3][3] * matrix2.m[3][0];
+	result.m[3][1] = matrix1.m[3][0] * matrix2.m[0][1] + matrix1.m[3][1] * matrix2.m[1][1] + matrix1.m[3][2] * matrix2.m[2][1] + matrix1.m[3][3] * matrix2.m[3][1];
+	result.m[3][2] = matrix1.m[3][0] * matrix2.m[0][2] + matrix1.m[3][1] * matrix2.m[1][2] + matrix1.m[3][2] * matrix2.m[2][2] + matrix1.m[3][3] * matrix2.m[3][2];
+	result.m[3][3] = matrix1.m[3][0] * matrix2.m[0][3] + matrix1.m[3][1] * matrix2.m[1][3] + matrix1.m[3][2] * matrix2.m[2][3] + matrix1.m[3][3] * matrix2.m[3][3];
 
 	return result;
 }
+
+
 #pragma endregion
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -105,6 +124,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	char keys[256] = { 0 };
 	char preKeys[256] = { 0 };
 
+	// 変数の初期化
+	Vector3 rotate{ 0.4f, 1.43f, -0.8f };
+
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
 		// フレームの開始
@@ -114,24 +136,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		memcpy(preKeys, keys, 256);
 		Novice::GetHitKeyStateAll(keys);
 
-		// 変数の初期化
-		Vector3 translate{ 4.1f, 2.6f, 0.8f };
-		Vector3 scale{ 1.5f, 5.2f, 7.3f };
-		Vector3 point{ 2.3f, 3.8f, 1.4f };
-		Matrix4x4 transformMatrix = {
-			1.0f, 2.0f, 3.0f, 4.0f,
-			3.0f, 1.0f, 1.0f, 2.0f,
-			1.0f, 4.0f, 2.0f, 3.0f,
-			2.0f, 2.0f, 1.0f, 3.0f
-		};
-
 		///
 		/// ↓更新処理ここから
 		///
 
-		Matrix4x4 translateMatrix = MakeTranslateMatrix(translate);
-		Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
-		Vector3 transformed = Transform(point, transformMatrix);
+		Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
+		Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
+		Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
+		Matrix4x4 rotateXYZMatrix = Multiply(rotateXMatrix, Multiply(rotateYMatrix, rotateZMatrix));
 
 		///
 		/// ↑更新処理ここまで
@@ -141,14 +153,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		// 平行移動
-		VectorScreenPrintf(0, 0, transformed, "transformed");
-
-		// 拡大縮小
-		MatrixScreenPrintf(0, kRowHeight, translateMatrix, "translateMatrix");
-
-		// 座標変換
-		MatrixScreenPrintf(0, kRowHeight * 6, scaleMatrix, "scaleMatrix");
+		MatrixScreenPrintf(0, 0, rotateXMatrix, "rotateXMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5, rotateYMatrix, "rotateYMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5 * 2, rotateZMatrix, "rotateZMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5 * 3, rotateXYZMatrix, "rotateXYZMatrix");
 
 		///
 		/// ↑描画処理ここまで
