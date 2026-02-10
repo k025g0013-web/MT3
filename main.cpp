@@ -1,8 +1,8 @@
 #include <Novice.h>
-#include <cmath>
+#include <math.h>
 #include <cassert>
 
-const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_00_05_確認課題";
+const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_00_03_確認課題";
 
 // 行列
 //=========================
@@ -24,6 +24,14 @@ struct Matrix4x4 {
 static const int kRowHeight = 20;
 static const int kColumnWidth = 60;
 
+void VectorScreenPrintf(int x, int y, const Vector3 &vector, const char *label) {
+	Novice::ScreenPrintf(x, y, "%.02f", vector.x);
+	Novice::ScreenPrintf(x + kColumnWidth, y, "%.02f", vector.y);
+	Novice::ScreenPrintf(x + kColumnWidth * 2, y, "%.02f", vector.z);
+	Novice::ScreenPrintf(x + kColumnWidth * 3, y, "%s", label);
+}
+
+
 void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 	Novice::ScreenPrintf(x, y, "%s", label);
 
@@ -41,33 +49,50 @@ void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 #pragma endregion
 
 #pragma region 計算関数
-Matrix4x4 MakeAffineMatrix(Vector3 &scale, Vector3 &rotation, Vector3 &translation) {
-	// アフィン変換行列の作成
-	Matrix4x4 affineMatrix = {};
+// 平行移動行列
+Matrix4x4 MakeTranslateMatrix(const Vector3 &translate) {
+	Matrix4x4 result = {};
 
-	for (int i = 0; i < 4; i++) {
-		affineMatrix.m[i][i] = 1.0f;
+	// 単位行列にする
+	for (int i = 0; i < 4; ++i) {
+		result.m[i][i] = 1.0f;
 	}
 
-	// アフィン変換行列
-	affineMatrix.m[0][0] = scale.x * (cos(rotation.y) * cos(rotation.z));
-	affineMatrix.m[0][1] = scale.x * (cos(rotation.y) * sin(rotation.z));
-	affineMatrix.m[0][2] = scale.x * (-sin(rotation.y));
+	result.m[3][0] = translate.x;
+	result.m[3][1] = translate.y;
+	result.m[3][2] = translate.z;
 
-	affineMatrix.m[1][0] = scale.y * (sin(rotation.x) * sin(rotation.y) * cos(rotation.z) - cos(rotation.x) * sin(rotation.z));
-	affineMatrix.m[1][1] = scale.y * (sin(rotation.x) * sin(rotation.y) * sin(rotation.z) + cos(rotation.x) * cos(rotation.z));
-	affineMatrix.m[1][2] = scale.y * (sin(rotation.x) * cos(rotation.y));
+	return result;
+}
 
-	affineMatrix.m[2][0] = scale.z * (cos(rotation.x) * sin(rotation.y) * cos(rotation.z) + sin(rotation.x) * sin(rotation.z));
-	affineMatrix.m[2][1] = scale.z * (cos(rotation.x) * sin(rotation.y) * sin(rotation.z) - sin(rotation.x) * cos(rotation.z));
-	affineMatrix.m[2][2] = scale.z * (cos(rotation.x) * cos(rotation.y));
+// 拡大縮小行列
+Matrix4x4 MakeScaleMatrix(const Vector3 &scale) {
+	Matrix4x4 result = {};
 
-	affineMatrix.m[3][0] = translation.x;
-	affineMatrix.m[3][1] = translation.y;
-	affineMatrix.m[3][2] = translation.z;
+	result.m[0][0] = scale.x;
+	result.m[1][1] = scale.y;
+	result.m[2][2] = scale.z;
+	result.m[3][3] = 1.0f;
 
-	return affineMatrix;
-};
+	return result;
+}
+
+// 座標変換
+Vector3 Transform(const Vector3 &vector, const Matrix4x4 &matrix) {
+	Vector3 result = {};
+
+	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + matrix.m[3][0];
+	result.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + matrix.m[3][1];
+	result.z = vector.x * matrix.m[0][2] + vector.y * matrix.m[1][2] + vector.z * matrix.m[2][2] + matrix.m[3][2];
+
+	float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] + vector.z * matrix.m[2][3] + matrix.m[3][3];
+	assert(w != 0.0f);
+	result.x /= w;
+	result.y /= w;
+	result.z /= w;
+
+	return result;
+}
 #pragma endregion
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -81,9 +106,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	char preKeys[256] = { 0 };
 
 	// 変数の初期化
-	Vector3 scale{1.2f, 0.79f, -2.1f};
-	Vector3 rotate{0.4f, 1.43f, -0.8f};
-	Vector3 transform{2.7f, -4.15f, 1.57f};
+	Vector3 translate{ 4.1f, 2.6f, 0.8f };
+	Vector3 scale{ 1.5f, 5.2f, 7.3f };
+	Vector3 point{ 2.3f, 3.8f, 1.4f };
+	Matrix4x4 transformMatrix = {
+		1.0f, 2.0f, 3.0f, 4.0f,
+		3.0f, 1.0f, 1.0f, 2.0f,
+		1.0f, 4.0f, 2.0f, 3.0f,
+		2.0f, 2.0f, 1.0f, 3.0f
+	};
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -98,7 +129,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓更新処理ここから
 		///
 
-		Matrix4x4 worldMatrix = MakeAffineMatrix(scale, rotate, transform);
+		Matrix4x4 translateMatrix = MakeTranslateMatrix(translate);
+		Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
+		Vector3 transformed = Transform(point, transformMatrix);
 
 		///
 		/// ↑更新処理ここまで
@@ -108,8 +141,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		MatrixScreenPrintf(0, 0, worldMatrix, "worldMatrix");
-		
+		// 平行移動
+		VectorScreenPrintf(0, 0, transformed, "transformed");
+
+		// 拡大縮小
+		MatrixScreenPrintf(0, kRowHeight, translateMatrix, "translateMatrix");
+
+		// 座標変換
+		MatrixScreenPrintf(0, kRowHeight * 6, scaleMatrix, "scaleMatrix");
+
 		///
 		/// ↑描画処理ここまで
 		///
