@@ -9,7 +9,7 @@
 #include "imgui.h"
 #endif 
 
-const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_01_02_確認課題";
+const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_02_00_確認課題";
 
 // 行列
 //=========================
@@ -29,6 +29,21 @@ struct Sphere {
 	float radius;
 };
 
+struct Line {
+	Vector3 origin;
+	Vector3 diff;
+};
+
+struct Ray {
+	Vector3 origin;
+	Vector3 diff;
+};
+
+struct Segment {
+	Vector3 origin;
+	Vector3 diff;
+};
+
 // 関数
 //=========================
 #pragma region VectorScreenPrintf
@@ -46,43 +61,108 @@ void VectorScreenPrintf(int x, int y, const Vector3 &vector, const char *label) 
 #pragma endregion
 
 #pragma region 計算関数
-// クロス積
-Vector3 Cross(const Vector3& v1, const Vector3& v2) {
-	Vector3 result = {};
+// 加算
+Vector3 Add(const Vector3 &v1, const Vector3 &v2) {
+	Vector3 result = {
+		v1.x + v2.x,
+		v1.y + v2.y,
+		v1.z + v2.z,
+	};
+	return result;
+}
 
-	result.x = v1.y * v2.z - v1.z * v2.y;
-	result.y = v1.z * v2.x - v1.x * v2.z;
-	result.z = v1.x * v2.y - v1.y * v2.x;
+// 減算
+Vector3 Subtract(const Vector3 &v1, const Vector3 &v2) {
+	Vector3 result = {
+		v1.x - v2.x,
+		v1.y - v2.y,
+		v1.z - v2.z,
+	};
+	return result;
+}
+
+// スカラー倍
+Vector3 Multiply(float scalar, const Vector3 &v) {
+	Vector3 result = {
+		scalar * v.x,
+		scalar * v.y,
+		scalar * v.z,
+	};
+	return result;
+}
+
+// 内積
+float Dot(const Vector3 &v1, const Vector3 &v2) {
+	float result =
+		v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 
 	return result;
-};
+}
 
-// アフィン変換行列
-Matrix4x4 MakeAffineMatrix(const Vector3 &scale, const Vector3 &rotation, const Vector3 &translation) {
-	Matrix4x4 affineMatrix = {};
+// 長さ
+float Length(const Vector3 &v) {
+	float result =
+		sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2));
 
-	for (int i = 0; i < 4; i++) {
-		affineMatrix.m[i][i] = 1.0f;
+	return result;
+}
+
+// 正規化
+Vector3 Normalize(const Vector3 &v) {
+	Vector3 result = {
+		v.x / sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2)),
+		v.y / sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2)),
+		v.z / sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2)),
+	};
+	return result;
+}
+
+// 行列の加法
+Matrix4x4 Add(const Matrix4x4 &m1, const Matrix4x4 &m2) {
+	Matrix4x4 result = {};
+	for (int row = 0; row < 4; row++) {
+		for (int column = 0; column < 4; column++) {
+			result.m[row][column] = m1.m[row][column] + m2.m[row][column];
+		}
 	}
+	return result;
+}
 
-	affineMatrix.m[0][0] = scale.x * (cos(rotation.y) * cos(rotation.z));
-	affineMatrix.m[0][1] = scale.x * (cos(rotation.y) * sin(rotation.z));
-	affineMatrix.m[0][2] = scale.x * (-sin(rotation.y));
+// 行列の減法
+Matrix4x4 Subtract(const Matrix4x4 &m1, const Matrix4x4 &m2) {
+	Matrix4x4 result = {};
+	for (int row = 0; row < 4; row++) {
+		for (int column = 0; column < 4; column++) {
+			result.m[row][column] = m1.m[row][column] - m2.m[row][column];
+		}
+	}
+	return result;
+}
 
-	affineMatrix.m[1][0] = scale.y * (sin(rotation.x) * sin(rotation.y) * cos(rotation.z) - cos(rotation.x) * sin(rotation.z));
-	affineMatrix.m[1][1] = scale.y * (sin(rotation.x) * sin(rotation.y) * sin(rotation.z) + cos(rotation.x) * cos(rotation.z));
-	affineMatrix.m[1][2] = scale.y * (sin(rotation.x) * cos(rotation.y));
+// 行列の積
+Matrix4x4 Multiply(const Matrix4x4 &m1, const Matrix4x4 &m2) {
+	Matrix4x4 result = {};
+	for (int row = 0; row < 4; row++) {
+		for (int column = 0; column < 4; column++) {
+			for (int k = 0; k < 4; k++) {
+				result.m[row][column] += m1.m[row][k] * m2.m[k][column];
+			}
+		}
+	}
+	return result;
+}
 
-	affineMatrix.m[2][0] = scale.z * (cos(rotation.x) * sin(rotation.y) * cos(rotation.z) + sin(rotation.x) * sin(rotation.z));
-	affineMatrix.m[2][1] = scale.z * (cos(rotation.x) * sin(rotation.y) * sin(rotation.z) - sin(rotation.x) * cos(rotation.z));
-	affineMatrix.m[2][2] = scale.z * (cos(rotation.x) * cos(rotation.y));
+// 行列式
+float Det3(
+	float a1, float a2, float a3,
+	float b1, float b2, float b3,
+	float c1, float c2, float c3) {
 
-	affineMatrix.m[3][0] = translation.x;
-	affineMatrix.m[3][1] = translation.y;
-	affineMatrix.m[3][2] = translation.z;
-
-	return affineMatrix;
-};
+	return
+		a1 * (b2 * c3 - b3 * c2) -
+		a2 * (b1 * c3 - b3 * c1) +
+		a3 * (b1 * c2 - b2 * c1);
+}
 
 // 逆行列
 Matrix4x4 Inverse(const Matrix4x4 &m) {
@@ -181,18 +261,142 @@ Matrix4x4 Inverse(const Matrix4x4 &m) {
 	return result;
 }
 
-// 行列の積
-Matrix4x4 Multiply(const Matrix4x4 &m1, const Matrix4x4 &m2) {
+// 転置行列
+Matrix4x4 Transpose(const Matrix4x4 &m) {
 	Matrix4x4 result = {};
 	for (int row = 0; row < 4; row++) {
 		for (int column = 0; column < 4; column++) {
-			for (int k = 0; k < 4; k++) {
-				result.m[row][column] += m1.m[row][k] * m2.m[k][column];
-			}
+			result.m[row][column] = m.m[column][row];
 		}
 	}
 	return result;
 }
+
+// 単位行列の作成
+Matrix4x4 MakeIdentity4x4() {
+	Matrix4x4 result = {};
+	for (int i = 0; i < 4; i++) {
+		result.m[i][i] = 1;
+	}
+	return result;
+}
+
+// 平行移動行列
+Matrix4x4 MakeTranslateMatrix(const Vector3 &translate) {
+	Matrix4x4 result = {};
+
+	// 単位行列にする
+	for (int i = 0; i < 4; ++i) {
+		result.m[i][i] = 1.0f;
+	}
+
+	result.m[3][0] = translate.x;
+	result.m[3][1] = translate.y;
+	result.m[3][2] = translate.z;
+
+	return result;
+}
+
+// 拡大縮小行列
+Matrix4x4 MakeScaleMatrix(const Vector3 &scale) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = scale.x;
+	result.m[1][1] = scale.y;
+	result.m[2][2] = scale.z;
+	result.m[3][3] = 1.0f;
+
+	return result;
+}
+
+// 座標変換
+Vector3 Transform(const Vector3 &vector, const Matrix4x4 &matrix) {
+	Vector3 result = {};
+
+	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + matrix.m[3][0];
+	result.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + matrix.m[3][1];
+	result.z = vector.x * matrix.m[0][2] + vector.y * matrix.m[1][2] + vector.z * matrix.m[2][2] + matrix.m[3][2];
+
+	float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] + vector.z * matrix.m[2][3] + matrix.m[3][3];
+	assert(w != 0.0f);
+	result.x /= w;
+	result.y /= w;
+	result.z /= w;
+
+	return result;
+}
+
+// x軸回転行列
+Matrix4x4 MakeRotateXMatrix(float radian) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = 1.0f;
+	result.m[1][1] = cosf(radian);
+	result.m[1][2] = sinf(radian);
+
+	result.m[2][1] = -sinf(radian);
+	result.m[2][2] = cosf(radian);
+	result.m[3][3] = 1.0f;
+
+	return result;
+};
+
+// y軸回転行列
+Matrix4x4 MakeRotateYMatrix(float radian) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = cosf(radian);
+	result.m[0][2] = -sinf(radian);
+	result.m[1][1] = 1.0f;
+	result.m[2][0] = sinf(radian);
+	result.m[2][2] = cosf(radian);
+	result.m[3][3] = 1.0f;
+
+	return result;
+};
+
+// z軸回転行列
+Matrix4x4 MakeRotateZMatrix(float radian) {
+	Matrix4x4 result = {};
+
+	result.m[0][0] = cosf(radian);
+	result.m[0][1] = sinf(radian);
+	result.m[1][0] = -sinf(radian);
+	result.m[1][1] = cosf(radian);
+	result.m[2][2] = 1.0f;
+	result.m[3][3] = 1.0f;
+
+	return result;
+};
+
+// アフィン変換
+Matrix4x4 MakeAffineMatrix(Vector3 &scale, Vector3 &rotation, Vector3 &translation) {
+	// アフィン変換行列の作成
+	Matrix4x4 affineMatrix = {};
+
+	for (int i = 0; i < 4; i++) {
+		affineMatrix.m[i][i] = 1.0f;
+	}
+
+	// アフィン変換行列
+	affineMatrix.m[0][0] = scale.x * (cos(rotation.y) * cos(rotation.z));
+	affineMatrix.m[0][1] = scale.x * (cos(rotation.y) * sin(rotation.z));
+	affineMatrix.m[0][2] = scale.x * (-sin(rotation.y));
+
+	affineMatrix.m[1][0] = scale.y * (sin(rotation.x) * sin(rotation.y) * cos(rotation.z) - cos(rotation.x) * sin(rotation.z));
+	affineMatrix.m[1][1] = scale.y * (sin(rotation.x) * sin(rotation.y) * sin(rotation.z) + cos(rotation.x) * cos(rotation.z));
+	affineMatrix.m[1][2] = scale.y * (sin(rotation.x) * cos(rotation.y));
+
+	affineMatrix.m[2][0] = scale.z * (cos(rotation.x) * sin(rotation.y) * cos(rotation.z) + sin(rotation.x) * sin(rotation.z));
+	affineMatrix.m[2][1] = scale.z * (cos(rotation.x) * sin(rotation.y) * sin(rotation.z) - sin(rotation.x) * cos(rotation.z));
+	affineMatrix.m[2][2] = scale.z * (cos(rotation.x) * cos(rotation.y));
+
+	affineMatrix.m[3][0] = translation.x;
+	affineMatrix.m[3][1] = translation.y;
+	affineMatrix.m[3][2] = translation.z;
+
+	return affineMatrix;
+};
 
 // 透視投影行列
 Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip) {
@@ -241,22 +445,44 @@ Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, f
 	return result;
 };
 
-// 座標変換
-Vector3 Transform(const Vector3 &vector, const Matrix4x4 &matrix) {
+// クロス積
+Vector3 Cross(const Vector3 &v1, const Vector3 &v2) {
 	Vector3 result = {};
 
-	result.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + matrix.m[3][0];
-	result.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + matrix.m[3][1];
-	result.z = vector.x * matrix.m[0][2] + vector.y * matrix.m[1][2] + vector.z * matrix.m[2][2] + matrix.m[3][2];
-
-	float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] + vector.z * matrix.m[2][3] + matrix.m[3][3];
-	assert(w != 0.0f);
-	result.x /= w;
-	result.y /= w;
-	result.z /= w;
+	result.x = v1.y * v2.z - v1.z * v2.y;
+	result.y = v1.z * v2.x - v1.x * v2.z;
+	result.z = v1.x * v2.y - v1.y * v2.x;
 
 	return result;
-}
+};
+
+// アフィン変換行列
+Matrix4x4 MakeAffineMatrix(const Vector3 &scale, const Vector3 &rotation, const Vector3 &translation) {
+	Matrix4x4 affineMatrix = {};
+
+	for (int i = 0; i < 4; i++) {
+		affineMatrix.m[i][i] = 1.0f;
+	}
+
+	affineMatrix.m[0][0] = scale.x * (cos(rotation.y) * cos(rotation.z));
+	affineMatrix.m[0][1] = scale.x * (cos(rotation.y) * sin(rotation.z));
+	affineMatrix.m[0][2] = scale.x * (-sin(rotation.y));
+
+	affineMatrix.m[1][0] = scale.y * (sin(rotation.x) * sin(rotation.y) * cos(rotation.z) - cos(rotation.x) * sin(rotation.z));
+	affineMatrix.m[1][1] = scale.y * (sin(rotation.x) * sin(rotation.y) * sin(rotation.z) + cos(rotation.x) * cos(rotation.z));
+	affineMatrix.m[1][2] = scale.y * (sin(rotation.x) * cos(rotation.y));
+
+	affineMatrix.m[2][0] = scale.z * (cos(rotation.x) * sin(rotation.y) * cos(rotation.z) + sin(rotation.x) * sin(rotation.z));
+	affineMatrix.m[2][1] = scale.z * (cos(rotation.x) * sin(rotation.y) * sin(rotation.z) - sin(rotation.x) * cos(rotation.z));
+	affineMatrix.m[2][2] = scale.z * (cos(rotation.x) * cos(rotation.y));
+
+	affineMatrix.m[3][0] = translation.x;
+	affineMatrix.m[3][1] = translation.y;
+	affineMatrix.m[3][2] = translation.z;
+
+	return affineMatrix;
+};
+
 #pragma endregion
 
 #pragma region グリッドと球体
@@ -379,6 +605,28 @@ void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, con
 };
 #pragma endregion
 
+Vector3 Project(const Vector3 &v1, const Vector3 &v2) {
+	float dot = Dot(v1, v2);
+	float lengthSq = Dot(v2, v2);
+
+	float t = dot / lengthSq;
+
+	return Multiply(t, v2);
+}
+
+Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
+	Vector3 vector = Subtract(point, segment.origin);
+
+	float t = Dot(vector, segment.diff) / Dot(segment.diff, segment.diff);
+	if (t < 0.0f) {
+		t = 0.0f;
+	} else if (t > 1.0f) {
+		t = 1.0f;
+	}
+
+	return Add(segment.origin, Multiply(t, segment.diff));
+}
+
 static const float kWindowWidth = 1280.0f;
 static const float kWindowHeight = 720.0f;
 
@@ -395,10 +643,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/* 変数の初期化
 	---------------*/
 
-	// 球体
-	Sphere sphere = {
-		{0,0,0}, 1.0f
-	};
+	// 計算に使用する値
+	Segment segment{ {-2.0f, -1.0f, 0.0f}, {3.0f, 2.0f, 2.0f} };
+	Vector3 point{-1.5f, 0.6f, 0.6f};
+	// pointを線分に射影したベクトル。今回は正しく計算できているかを確認するためだけに使う。
+	Vector3 project = Project(Subtract(point, segment.origin), segment.diff);
+
+	// この値が線分上の点を表す
+	Vector3 closestPoint = ClosestPoint(point, segment);
 
 	// カメラ
 	Vector3 cameraTranslation{0.0f, 1.9f, -6.49f};
@@ -419,10 +671,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region ImGui
 		ImGui::Begin("Window");
-		ImGui::DragFloat3("CameraTranslate", &cameraTranslation.x, 0.01f);
-		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("SphereCenter", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("SphereRadius", &sphere.radius, 0.01f);
+		ImGui::InputFloat3("Point", &point.x, "%0.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::InputFloat3("Segment origin", &segment.origin.x, "%0.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::InputFloat3("Segment diff", &segment.diff.x, "%0.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::InputFloat3("Project", &project.x, "%0.3f", ImGuiInputTextFlags_ReadOnly);
 		ImGui::End();
 #pragma endregion
 
@@ -439,7 +691,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// ViewportMatrixを作る
 		Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
-		
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -450,7 +702,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0x000000FF);
+		// 点の描画
+		Sphere pointSphere{ point, 0.01f };
+		Sphere closestPointSphere{ closestPoint, 0.01f };
+		DrawSphere(pointSphere, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
+		DrawSphere(closestPointSphere, viewProjectionMatrix, viewportMatrix, 0x000000FF);
+
+		// 線分の描画
+		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
+		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff),viewProjectionMatrix), viewportMatrix);
+		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
