@@ -9,7 +9,7 @@
 #include "imgui.h"
 #endif 
 
-const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_02_00_確認課題";
+const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_02_01_確認課題";
 
 // 行列
 //=========================
@@ -56,6 +56,20 @@ void VectorScreenPrintf(int x, int y, const Vector3 &vector, const char *label) 
 	Novice::ScreenPrintf(x + kColumnWidth, y, "%.02f", vector.y);
 	Novice::ScreenPrintf(x + kColumnWidth * 2, y, "%.02f", vector.z);
 	Novice::ScreenPrintf(x + kColumnWidth * 3, y, "%s", label);
+}
+
+void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
+	Novice::ScreenPrintf(x, y, "%s", label);
+
+	for (int row = 0; row < 4; ++row) {
+		for (int column = 0; column < 4; ++column) {
+			Novice::ScreenPrintf(
+				x + column * kColumnWidth,
+				y + row * kRowHeight + 20,
+				"%6.02f", matrix.m[row][column]
+			);
+		}
+	}
 }
 
 #pragma endregion
@@ -603,8 +617,22 @@ void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, con
 		}
 	}
 };
+
+// 弾同士の当たり判定
+bool IsCollision(const Sphere& s1, const Sphere &s2) {
+	float distance = Length(
+		{
+		s2.center.x - s1.center.x,
+		s2.center.y - s1.center.y,
+		s2.center.z - s1.center.z
+		}
+	);
+
+	return distance <= s1.radius + s2.radius;
+}
 #pragma endregion
 
+#pragma endregion 点と線
 Vector3 Project(const Vector3 &v1, const Vector3 &v2) {
 	float dot = Dot(v1, v2);
 	float lengthSq = Dot(v2, v2);
@@ -626,6 +654,7 @@ Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
 
 	return Add(segment.origin, Multiply(t, segment.diff));
 }
+#pragma region 
 
 static const float kWindowWidth = 1280.0f;
 static const float kWindowHeight = 720.0f;
@@ -642,15 +671,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-
-	// 計算に使用する値
-	Segment segment{ {-2.0f, -1.0f, 0.0f}, {3.0f, 2.0f, 2.0f} };
-	Vector3 point{-1.5f, 0.6f, 0.6f};
-	// pointを線分に射影したベクトル。今回は正しく計算できているかを確認するためだけに使う。
-	Vector3 project = Project(Subtract(point, segment.origin), segment.diff);
-
-	// この値が線分上の点を表す
-	Vector3 closestPoint = ClosestPoint(point, segment);
+	// 球
+	Sphere sphere1{ {-1.0f, 0,  1.0f}, 1.0f };
+	Sphere sphere2{ { 1.0f, 0, -0.5f}, 0.5f };
 
 	// カメラ
 	Vector3 cameraTranslation{0.0f, 1.9f, -6.49f};
@@ -671,10 +694,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region ImGui
 		ImGui::Begin("Window");
-		ImGui::InputFloat3("Point", &point.x, "%0.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Segment origin", &segment.origin.x, "%0.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Segment diff", &segment.diff.x, "%0.3f", ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat3("Project", &project.x, "%0.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::DragFloat3("Sphere[0].center", &sphere1.center.x, 0.01f);
+		ImGui::DragFloat("Sphere[0].radius", &sphere1.radius, 0.01f);
+		ImGui::DragFloat3("Sphere[1].center", &sphere2.center.x, 0.01f);
+		ImGui::DragFloat("Sphere[1].radius", &sphere2.radius, 0.01f);
 		ImGui::End();
 #pragma endregion
 
@@ -702,16 +725,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		// 点の描画
-		Sphere pointSphere{ point, 0.01f };
-		Sphere closestPointSphere{ closestPoint, 0.01f };
-		DrawSphere(pointSphere, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
-		DrawSphere(closestPointSphere, viewProjectionMatrix, viewportMatrix, 0x000000FF);
+		if (IsCollision(sphere1, sphere2)) {
+			DrawSphere(sphere1, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
+		} else {
+			DrawSphere(sphere1, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		}
 
-		// 線分の描画
-		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
-		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff),viewProjectionMatrix), viewportMatrix);
-		Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFFFFFFFF);
+		DrawSphere(sphere2, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
