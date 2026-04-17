@@ -9,7 +9,7 @@
 #include "imgui.h"
 #endif 
 
-const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_02_01_確認課題";
+const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_02_02_確認課題";
 
 // 行列
 //=========================
@@ -42,6 +42,11 @@ struct Ray {
 struct Segment {
 	Vector3 origin;
 	Vector3 diff;
+};
+
+struct Plane {
+	Vector3 normal;
+	float distance;
 };
 
 // 関数
@@ -499,7 +504,7 @@ Matrix4x4 MakeAffineMatrix(const Vector3 &scale, const Vector3 &rotation, const 
 
 #pragma endregion
 
-#pragma region グリッドと球体
+#pragma region グリッドと球体と平面
 // Drid表示
 void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix) {
 	const float kGridHalfWidth = 2.0f;										// Gridの半分の幅
@@ -561,6 +566,7 @@ void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMa
 	}
 };
 
+// 球表示
 void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
 	const uint32_t kSubdivision = 16;									// 分割数
 	const float kLonEvery = 2.0f * float(M_PI) / float(kSubdivision);	// 経度分割1つ分の角度
@@ -618,7 +624,55 @@ void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, con
 	}
 };
 
-// 弾同士の当たり判定
+// 垂直線
+Vector3 Perpendicular(const Vector3 &vector) {
+	if (vector.x != 0.0f || vector.y != 0.0f) {
+		return { -vector.y, vector.x, 0.0f };
+	}
+	return {0.0f, -vector.z, vector.y};
+}
+
+// 平面表示
+void DrawPlane(const Plane &plane, const Matrix4x4 &viewPrijectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
+	// 中心点を決める
+	Vector3 center = Multiply(plane.distance, plane.normal);
+
+	// 垂直線ベクトルを求める
+	Vector3 perpendiculars[4];
+	perpendiculars[0] = Normalize(Perpendicular(plane.normal));								// 法線と垂直なベクトルを1つ求める
+	perpendiculars[1] = {-perpendiculars[0].x, -perpendiculars[0].y, -perpendiculars[0].z};	// 逆ベクトルを求める
+	perpendiculars[2] = Cross(plane.normal, perpendiculars[0]);								// 法線とのクロス積を求める
+	perpendiculars[3] = {-perpendiculars[2].x, -perpendiculars[2].y, -perpendiculars[2].z};	// 逆ベクトルを求める
+
+	// 四頂点を求める
+	Vector3 points[4];
+	for (int32_t index = 0; index < 4; ++index) {
+		// 
+		Vector3 extend = Multiply(2.0f, perpendiculars[index]);
+		Vector3 point = Add(center, extend);
+		points[index] = Transform(Transform(point, viewPrijectionMatrix), viewportMatrix);
+	}
+
+	// 四頂点を結ぶ
+	for (int i = 0; i < 2; i++) {
+		Novice::DrawLine(
+			static_cast<int>(points[i].x), static_cast<int>(points[i].y),
+			static_cast<int>(points[2].x), static_cast<int>(points[2].y),
+			color
+		);
+
+		Novice::DrawLine(
+			static_cast<int>(points[i].x), static_cast<int>(points[i].y),
+			static_cast<int>(points[3].x), static_cast<int>(points[3].y),
+			color
+		);
+	}
+}
+
+#pragma endregion
+
+#pragma region 当たり判定
+// 球同士の当たり判定
 bool IsCollision(const Sphere& s1, const Sphere &s2) {
 	float distance = Length(
 		{
@@ -630,9 +684,17 @@ bool IsCollision(const Sphere& s1, const Sphere &s2) {
 
 	return distance <= s1.radius + s2.radius;
 }
+
+// 球と平面の当たり判定
+bool IsCollision(const Sphere &sphere, const Plane &plane) {
+	float distance = Dot(sphere.center, plane.normal) - plane.distance;
+
+	return (-sphere.radius <= distance && distance <= sphere.radius);
+}
 #pragma endregion
 
-#pragma endregion 点と線
+#pragma region 点と線
+
 Vector3 Project(const Vector3 &v1, const Vector3 &v2) {
 	float dot = Dot(v1, v2);
 	float lengthSq = Dot(v2, v2);
@@ -654,7 +716,8 @@ Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
 
 	return Add(segment.origin, Multiply(t, segment.diff));
 }
-#pragma region 
+
+#pragma endregion 
 
 static const float kWindowWidth = 1280.0f;
 static const float kWindowHeight = 720.0f;
@@ -672,8 +735,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/* 変数の初期化
 	---------------*/
 	// 球
-	Sphere sphere1{ {-1.0f, 0,  1.0f}, 1.0f };
-	Sphere sphere2{ { 1.0f, 0, -0.5f}, 0.5f };
+	Sphere sphere{ {0.12f, 0.0f,  0.0f}, 0.6f };
+	Plane plane{ { 0.0f, 1.0f, 0.0f}, 1.0f };
 
 	// カメラ
 	Vector3 cameraTranslation{0.0f, 1.9f, -6.49f};
@@ -694,10 +757,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region ImGui
 		ImGui::Begin("Window");
-		ImGui::DragFloat3("Sphere[0].center", &sphere1.center.x, 0.01f);
-		ImGui::DragFloat("Sphere[0].radius", &sphere1.radius, 0.01f);
-		ImGui::DragFloat3("Sphere[1].center", &sphere2.center.x, 0.01f);
-		ImGui::DragFloat("Sphere[1].radius", &sphere2.radius, 0.01f);
+		
+		// 球
+		ImGui::DragFloat3("Sphere.Center", &sphere.center.x, 0.01f);
+		ImGui::DragFloat("Sphere.Radius", &sphere.radius, 0.01f);
+
+		// 平面
+		ImGui::DragFloat3("Plame.Normal", &plane.normal.x, 0.01f);
+		plane.normal = Normalize(plane.normal);
+		ImGui::DragFloat("Plane.Distance", &plane.distance, 0.01f);
+
 		ImGui::End();
 #pragma endregion
 
@@ -723,15 +792,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
+		// グリッド
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		if (IsCollision(sphere1, sphere2)) {
-			DrawSphere(sphere1, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
+		// 球
+		if (IsCollision(sphere, plane)) {
+			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
 		} else {
-			DrawSphere(sphere1, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 		}
 
-		DrawSphere(sphere2, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		// 平面
+		DrawPlane(plane, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
