@@ -207,7 +207,7 @@ Matrix4x4 Inverse(const Matrix4x4 &m) {
 	Matrix4x4 cofactor = {};
 	for (int i = 0; i < 4; ++i) {
 		for (int j = 0; j < 4; ++j) {
-			float sub[3][3];
+			float sub[3][3]{};
 			int r = 0;
 
 			// 元の行列を走査
@@ -359,7 +359,7 @@ Matrix4x4 MakeRotateYMatrix(float radian) {
 	result.m[0][0] = cosf(radian);
 	result.m[0][2] = -sinf(radian);
 	result.m[1][1] = 1.0f;
-	
+
 	result.m[2][0] = sinf(radian);
 	result.m[2][2] = cosf(radian);
 	result.m[3][3] = 1.0f;
@@ -383,33 +383,20 @@ Matrix4x4 MakeRotateZMatrix(float radian) {
 };
 
 // アフィン変換
-Matrix4x4 MakeAffineMatrix(Vector3 &scale, Vector3 &rotation, Vector3 &translation) {
-	// アフィン変換行列の作成
-	Matrix4x4 affineMatrix = {};
+Matrix4x4 MakeAffineMatrix(const Vector3 &scale, const Vector3 &rotation, const Vector3 &translation) {
 
-	for (int i = 0; i < 4; i++) {
-		affineMatrix.m[i][i] = 1.0f;
-	}
+	Matrix4x4 s = MakeScaleMatrix(scale);
 
-	// アフィン変換行列
-	affineMatrix.m[0][0] = scale.x * (cos(rotation.y) * cos(rotation.z));
-	affineMatrix.m[0][1] = scale.x * (cos(rotation.y) * sin(rotation.z));
-	affineMatrix.m[0][2] = scale.x * (-sin(rotation.y));
+	Matrix4x4 r = Multiply(Multiply(
+		MakeRotateXMatrix(rotation.x),
+		MakeRotateYMatrix(rotation.y)),
+		MakeRotateZMatrix(rotation.z)
+	);
 
-	affineMatrix.m[1][0] = scale.y * (sin(rotation.x) * sin(rotation.y) * cos(rotation.z) - cos(rotation.x) * sin(rotation.z));
-	affineMatrix.m[1][1] = scale.y * (sin(rotation.x) * sin(rotation.y) * sin(rotation.z) + cos(rotation.x) * cos(rotation.z));
-	affineMatrix.m[1][2] = scale.y * (sin(rotation.x) * cos(rotation.y));
+	Matrix4x4 t = MakeTranslateMatrix(translation);
 
-	affineMatrix.m[2][0] = scale.z * (cos(rotation.x) * sin(rotation.y) * cos(rotation.z) + sin(rotation.x) * sin(rotation.z));
-	affineMatrix.m[2][1] = scale.z * (cos(rotation.x) * sin(rotation.y) * sin(rotation.z) - sin(rotation.x) * cos(rotation.z));
-	affineMatrix.m[2][2] = scale.z * (cos(rotation.x) * cos(rotation.y));
-
-	affineMatrix.m[3][0] = translation.x;
-	affineMatrix.m[3][1] = translation.y;
-	affineMatrix.m[3][2] = translation.z;
-
-	return affineMatrix;
-};
+	return Multiply(Multiply(s, r), t);
+}
 
 // 透視投影行列
 Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip) {
@@ -467,33 +454,6 @@ Vector3 Cross(const Vector3 &v1, const Vector3 &v2) {
 	result.z = v1.x * v2.y - v1.y * v2.x;
 
 	return result;
-};
-
-// アフィン変換行列
-Matrix4x4 MakeAffineMatrix(const Vector3 &scale, const Vector3 &rotation, const Vector3 &translation) {
-	Matrix4x4 affineMatrix = {};
-
-	for (int i = 0; i < 4; i++) {
-		affineMatrix.m[i][i] = 1.0f;
-	}
-
-	affineMatrix.m[0][0] = scale.x * (cos(rotation.y) * cos(rotation.z));
-	affineMatrix.m[0][1] = scale.x * (cos(rotation.y) * sin(rotation.z));
-	affineMatrix.m[0][2] = scale.x * (-sin(rotation.y));
-
-	affineMatrix.m[1][0] = scale.y * (sin(rotation.x) * sin(rotation.y) * cos(rotation.z) - cos(rotation.x) * sin(rotation.z));
-	affineMatrix.m[1][1] = scale.y * (sin(rotation.x) * sin(rotation.y) * sin(rotation.z) + cos(rotation.x) * cos(rotation.z));
-	affineMatrix.m[1][2] = scale.y * (sin(rotation.x) * cos(rotation.y));
-
-	affineMatrix.m[2][0] = scale.z * (cos(rotation.x) * sin(rotation.y) * cos(rotation.z) + sin(rotation.x) * sin(rotation.z));
-	affineMatrix.m[2][1] = scale.z * (cos(rotation.x) * sin(rotation.y) * sin(rotation.z) - sin(rotation.x) * cos(rotation.z));
-	affineMatrix.m[2][2] = scale.z * (cos(rotation.x) * cos(rotation.y));
-
-	affineMatrix.m[3][0] = translation.x;
-	affineMatrix.m[3][1] = translation.y;
-	affineMatrix.m[3][2] = translation.z;
-
-	return affineMatrix;
 };
 
 #pragma endregion
@@ -656,14 +616,14 @@ void DrawPlane(const Plane &plane, const Matrix4x4 &viewPrijectionMatrix, const 
 	Vector3 center = Multiply(plane.distance, plane.normal);
 
 	// 垂直線ベクトルを求める
-	Vector3 perpendiculars[4];
+	Vector3 perpendiculars[4]{};
 	perpendiculars[0] = Normalize(Perpendicular(plane.normal));								// 法線と垂直なベクトルを1つ求める
 	perpendiculars[1] = { -perpendiculars[0].x, -perpendiculars[0].y, -perpendiculars[0].z };	// 逆ベクトルを求める
 	perpendiculars[2] = Cross(plane.normal, perpendiculars[0]);								// 法線とのクロス積を求める
 	perpendiculars[3] = { -perpendiculars[2].x, -perpendiculars[2].y, -perpendiculars[2].z };	// 逆ベクトルを求める
 
 	// 四頂点を求める
-	Vector3 points[4];
+	Vector3 points[4]{};
 	for (int32_t index = 0; index < 4; ++index) {
 		// 
 		Vector3 extend = Multiply(2.0f, perpendiculars[index]);
@@ -742,15 +702,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	// 線
-	Segment segment{ {-0.45f, 0.33f, 0.0f}, {1.0f, 0.58f, 0.0f} };
+	Vector3 scale{ 1.2f, 0.79f, -2.1f };
+	Vector3 rotate{ 0.4f, 1.43f, -0.8f };
+	Vector3 translate{ 2.7f, -4.15f, 1.57f };
 
-	// 平面
-	Plane plane{ { 0.0f, 1.0f, 0.0f}, 1.0f };
-
-	// カメラ
-	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
-	Vector3 cameraRotate{ 0.26f, 0.0f, 0.0f };
+	Matrix4x4 worldMatrix = MakeAffineMatrix(scale, rotate, translate);
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -765,39 +721,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓更新処理ここから
 		///
 
-#pragma region ImGui
-		ImGui::Begin("Window");
-
-		// 平面
-		ImGui::DragFloat3("Plame.Normal", &plane.normal.x, 0.01f);
-		plane.normal = Normalize(plane.normal);
-		ImGui::DragFloat("Plane.Distance", &plane.distance, 0.01f);
-
-		// 線
-		ImGui::DragFloat3("Segment.Origin", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("Segment.Diff", &segment.diff.x, 0.01f);
-
-		// カメラ
-		ImGui::DragFloat3("CameraTranslate", &cameraTranslation.x, 0.01f);
-		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-
-		ImGui::End();
-#pragma endregion
-
-		Matrix4x4 cameraMatrix =
-			MakeAffineMatrix({ 1,1,1 }, cameraRotate, cameraTranslation);
-
-		Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-
-		// 各種行列の計算
-		Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
-
-		// VPMatrixを作る
-		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
-
-		// ViewportMatrixを作る
-		Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
-
 		///
 		/// ↑更新処理ここまで
 		///
@@ -806,21 +729,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		// グリッド
-		DrawGrid(viewProjectionMatrix, viewportMatrix);
-
-		// 球
-		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
-		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
-
-		if (IsCollision(segment, plane)) {
-			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFF0000FF);
-		} else {
-			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFFFFFFFF);
-		}
-
-		// 平面
-		DrawPlane(plane, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		MatrixScreenPrintf(0, 0, worldMatrix, "worldMatrix");
 
 		///
 		/// ↑描画処理ここまで
