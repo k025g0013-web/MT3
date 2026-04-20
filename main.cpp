@@ -81,11 +81,11 @@ void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 	Novice::ScreenPrintf(x, y, "%s", label);
 
 	for (int row = 0; row < 4; ++row) {
-		for (int column = 0; column < 4; ++column) {
+		for (int col = 0; col < 4; ++col) {
 			Novice::ScreenPrintf(
-				x + column * kColumnWidth,
+				x + col * kColumnWidth,
 				y + row * kRowHeight + 20,
-				"%6.02f", matrix.m[row][column]
+				"%6.02f", matrix.m[row][col]
 			);
 		}
 	}
@@ -233,7 +233,7 @@ Matrix4x4 Inverse(const Matrix4x4 &m) {
 			// 符号付き余因子
 			float sign;
 			if ((i + j) % 2 == 0) {
-				sign = 1.0f; 
+				sign = 1.0f;
 			} else {
 				sign = -1.0f;
 			}
@@ -241,7 +241,7 @@ Matrix4x4 Inverse(const Matrix4x4 &m) {
 			cofactor.m[i][j] = sign * minor;
 		}
 	}
-	
+
 	// 転置行列
 	Matrix4x4 adjugate = {};
 	for (int i = 0; i < 4; ++i) {
@@ -498,7 +498,7 @@ Matrix4x4 MakeAffineMatrix(const Vector3 &scale, const Vector3 &rotation, const 
 
 #pragma region グリッドと球体と平面
 // Drid表示
-void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix) {
+void DrawGrid(const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix) {
 	const float kGridHalfWidth = 2.0f;										// Gridの半分の幅
 	const uint32_t kSubdivision = 10;										// 分割数
 	const float kGridEvery = (kGridHalfWidth * 2.0f) / float(kSubdivision);	// 一つ分の長さ
@@ -519,7 +519,7 @@ void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMa
 		Vector3 endScreen = Transform(end, vpvMatrix);
 
 		uint32_t color = 0xAAAAAAFF;
-		
+
 		// 原点軸は色を変える
 		if (fabs(x) < 0.0001f) {
 			color = 0x000000FF; // 黒
@@ -559,7 +559,7 @@ void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMa
 };
 
 // 球表示
-void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+void DrawSphere(const Sphere &sphere, const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
 	const uint32_t kSubdivision = 16;									// 分割数
 	const float kLonEvery = 2.0f * float(M_PI) / float(kSubdivision);	// 経度分割1つ分の角度
 	const float kLatEvery = float(M_PI) / float(kSubdivision);			// 緯度分割1つ分の角度
@@ -600,7 +600,7 @@ void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, con
 			Vector3 aScreen = Transform(a, vpvMatrix);
 			Vector3 bScreen = Transform(b, vpvMatrix);
 			Vector3 cScreen = Transform(c, vpvMatrix);
-			
+
 			// ab,bcで線を引く
 			Novice::DrawLine(
 				(int)aScreen.x, (int)aScreen.y,
@@ -621,7 +621,7 @@ Vector3 Perpendicular(const Vector3 &vector) {
 	if (vector.x != 0.0f || vector.y != 0.0f) {
 		return { -vector.y, vector.x, 0.0f };
 	}
-	return {0.0f, -vector.z, vector.y};
+	return { 0.0f, -vector.z, vector.y };
 }
 
 // 平面表示
@@ -632,9 +632,9 @@ void DrawPlane(const Plane &plane, const Matrix4x4 &viewPrijectionMatrix, const 
 	// 垂直線ベクトルを求める
 	Vector3 perpendiculars[4];
 	perpendiculars[0] = Normalize(Perpendicular(plane.normal));								// 法線と垂直なベクトルを1つ求める
-	perpendiculars[1] = {-perpendiculars[0].x, -perpendiculars[0].y, -perpendiculars[0].z};	// 逆ベクトルを求める
+	perpendiculars[1] = { -perpendiculars[0].x, -perpendiculars[0].y, -perpendiculars[0].z };	// 逆ベクトルを求める
 	perpendiculars[2] = Cross(plane.normal, perpendiculars[0]);								// 法線とのクロス積を求める
-	perpendiculars[3] = {-perpendiculars[2].x, -perpendiculars[2].y, -perpendiculars[2].z};	// 逆ベクトルを求める
+	perpendiculars[3] = { -perpendiculars[2].x, -perpendiculars[2].y, -perpendiculars[2].z };	// 逆ベクトルを求める
 
 	// 四頂点を求める
 	Vector3 points[4];
@@ -661,11 +661,35 @@ void DrawPlane(const Plane &plane, const Matrix4x4 &viewPrijectionMatrix, const 
 	}
 }
 
+// 正射影ベクトル
+Vector3 Project(const Vector3 &v1, const Vector3 &v2) {
+	float dot = Dot(v1, v2);
+	float lengthSq = Dot(v2, v2);
+
+	float t = dot / lengthSq;
+
+	return Multiply(t, v2);
+}
+
+// 最近接点
+Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
+	Vector3 vector = Subtract(point, segment.origin);
+
+	float t = Dot(vector, segment.diff) / Dot(segment.diff, segment.diff);
+	if (t < 0.0f) {
+		t = 0.0f;
+	} else if (t > 1.0f) {
+		t = 1.0f;
+	}
+
+	return Add(segment.origin, Multiply(t, segment.diff));
+}
+
 #pragma endregion
 
 #pragma region 当たり判定
 // 球同士の当たり判定
-bool IsCollision(const Sphere& s1, const Sphere &s2) {
+bool IsCollision(const Sphere &s1, const Sphere &s2) {
 	float distance = Length(
 		{
 		s2.center.x - s1.center.x,
@@ -683,31 +707,26 @@ bool IsCollision(const Sphere &sphere, const Plane &plane) {
 
 	return (-sphere.radius <= distance && distance <= sphere.radius);
 }
+
+// 線と平面の当たり判定
+bool IsCollision(const Segment &segment, const Plane &plane) {
+	// 法線と線の内積
+	float dot = Dot(plane.normal, segment.diff);
+
+	// 並行チェック
+	if (dot == 0.0f) {
+		return false;
+	}
+
+	// t
+	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
+
+	return (0.0f <= t && t <= 1.0f);
+}
+
 #pragma endregion
 
 #pragma region 点と線
-
-Vector3 Project(const Vector3 &v1, const Vector3 &v2) {
-	float dot = Dot(v1, v2);
-	float lengthSq = Dot(v2, v2);
-
-	float t = dot / lengthSq;
-
-	return Multiply(t, v2);
-}
-
-Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
-	Vector3 vector = Subtract(point, segment.origin);
-
-	float t = Dot(vector, segment.diff) / Dot(segment.diff, segment.diff);
-	if (t < 0.0f) {
-		t = 0.0f;
-	} else if (t > 1.0f) {
-		t = 1.0f;
-	}
-
-	return Add(segment.origin, Multiply(t, segment.diff));
-}
 
 #pragma endregion 
 
@@ -726,19 +745,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	Matrix4x4 m1 = {
-		3.2f, 0.7f, 9.6f, 4.4f,
-		5.5f, 1.3f, 7.8f, 2.1f,
-		6.9f, 8.0f, 2.6f, 1.0f,
-		0.5f, 7.2f, 5.1f, 3.3f,
-	};
+	// 線
+	Segment segment{ {-0.45f, 0.33f, 0.0f}, {1.0f, 0.58f, 0.0f} };
 
-	Matrix4x4 m2 = {
-		4.1f, 6.5f, 3.3f, 2.2f,
-		8.8f, 0.6f, 9.9f, 7.7f,
-		1.1f, 5.5f, 6.6f, 0.0f,
-		3.3f, 9.9f, 8.8f, 2.2f,
-	};
+	// 平面
+	Plane plane{ { 0.0f, 1.0f, 0.0f}, 1.0f };
+
+	// カメラ
+	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
+	Vector3 cameraRotate{ 0.26f, 0.0f, 0.0f };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -752,15 +767,39 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓更新処理ここから
 		///
-		
-		Matrix4x4 resultAdd = Add(m1, m2);
-		Matrix4x4 resultMultiply = Multiply(m1, m2);
-		Matrix4x4 resultSubtract = Subtract(m1, m2);
-		Matrix4x4 inverseM1 = Inverse(m1);
-		Matrix4x4 inverseM2 = Inverse(m2);
-		Matrix4x4 transposeM1 = Transpose(m1);
-		Matrix4x4 transposeM2 = Transpose(m2);
-		Matrix4x4 identity = MakeIdentity4x4();
+
+#pragma region ImGui
+		ImGui::Begin("Window");
+
+		// 平面
+		ImGui::DragFloat3("Plame.Normal", &plane.normal.x, 0.01f);
+		plane.normal = Normalize(plane.normal);
+		ImGui::DragFloat("Plane.Distance", &plane.distance, 0.01f);
+
+		// 線
+		ImGui::DragFloat3("Segment.Origin", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("Segment.Diff", &segment.diff.x, 0.01f);
+
+		// カメラ
+		ImGui::DragFloat3("CameraTranslate", &cameraTranslation.x, 0.01f);
+		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
+
+		ImGui::End();
+#pragma endregion
+
+		Matrix4x4 cameraMatrix =
+			MakeAffineMatrix({ 1,1,1 }, cameraRotate, cameraTranslation);
+
+		Matrix4x4 viewMatrix = Inverse(cameraMatrix);
+
+		// 各種行列の計算
+		Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
+
+		// VPMatrixを作る
+		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+
+		// ViewportMatrixを作る
+		Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
 
 		///
 		/// ↑更新処理ここまで
@@ -770,15 +809,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		VectorScreenPrintf(0, 0, resultAdd, "Add");
-		VectorScreenPrintf(0, kRowHeight * 5, resultSubtract, "Subtract");
-		VectorScreenPrintf(0, kRowHeight * 5 * 2, resultMultiply, "Multiply");
-		VectorScreenPrintf(0, kRowHeight * 5 * 3, inverseM1, "inverseM1");
-		VectorScreenPrintf(0, kRowHeight * 5 * 4, inverseM2, "inverseM2");
+		// グリッド
+		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		VectorScreenPrintf(kColumnWidth * 5, 0, transposeM1, "transposeM1");
-		VectorScreenPrintf(kColumnWidth * 5, kRowHeight * 5, transposeM2, "transposeM2");
-		VectorScreenPrintf(kColumnWidth * 5, kRowHeight * 5 * 2, identity, "identity");
+		// 球
+		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
+		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
+
+		if (IsCollision(segment, plane)) {
+			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFF0000FF);
+		} else {
+			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFFFFFFFF);
+		}
+
+		// 平面
+		DrawPlane(plane, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
