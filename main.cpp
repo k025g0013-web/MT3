@@ -63,6 +63,20 @@ void VectorScreenPrintf(int x, int y, const Vector3 &vector, const char *label) 
 	Novice::ScreenPrintf(x + kColumnWidth * 3, y, "%s", label);
 }
 
+void VectorScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
+	Novice::ScreenPrintf(x, y, "%s", label);
+
+	for (int row = 0; row < 4; ++row) {
+		for (int column = 0; column < 4; ++column) {
+			Novice::ScreenPrintf(
+				x + column * kColumnWidth,
+				y + row * kRowHeight + 20,
+				"%6.02f", matrix.m[row][column]
+			);
+		}
+	}
+}
+
 void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 	Novice::ScreenPrintf(x, y, "%s", label);
 
@@ -128,11 +142,13 @@ float Length(const Vector3 &v) {
 
 // 正規化
 Vector3 Normalize(const Vector3 &v) {
+	float length = Length(v);
 	Vector3 result = {
-		v.x / sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2)),
-		v.y / sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2)),
-		v.z / sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2)),
+		v.x / length,
+		v.y / length,
+		v.z / length,
 	};
+
 	return result;
 }
 
@@ -187,95 +203,71 @@ float Det3(
 Matrix4x4 Inverse(const Matrix4x4 &m) {
 	Matrix4x4 result = {};
 
-	float det =
-		m.m[0][0] * (
-			m.m[1][1] * (m.m[2][2] * m.m[3][3] - m.m[2][3] * m.m[3][2]) -
-			m.m[1][2] * (m.m[2][1] * m.m[3][3] - m.m[2][3] * m.m[3][1]) +
-			m.m[1][3] * (m.m[2][1] * m.m[3][2] - m.m[2][2] * m.m[3][1])) -
-		m.m[0][1] * (
-			m.m[1][0] * (m.m[2][2] * m.m[3][3] - m.m[2][3] * m.m[3][2]) -
-			m.m[1][2] * (m.m[2][0] * m.m[3][3] - m.m[2][3] * m.m[3][0]) +
-			m.m[1][3] * (m.m[2][0] * m.m[3][2] - m.m[2][2] * m.m[3][0])) +
-		m.m[0][2] * (
-			m.m[1][0] * (m.m[2][1] * m.m[3][3] - m.m[2][3] * m.m[3][1]) -
-			m.m[1][1] * (m.m[2][0] * m.m[3][3] - m.m[2][3] * m.m[3][0]) +
-			m.m[1][3] * (m.m[2][0] * m.m[3][1] - m.m[2][1] * m.m[3][0])) -
-		m.m[0][3] * (
-			m.m[1][0] * (m.m[2][1] * m.m[3][2] - m.m[2][2] * m.m[3][1]) -
-			m.m[1][1] * (m.m[2][0] * m.m[3][2] - m.m[2][2] * m.m[3][0]) +
-			m.m[1][2] * (m.m[2][0] * m.m[3][1] - m.m[2][1] * m.m[3][0]));
+	// 余因子行列
+	Matrix4x4 cofactor = {};
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			float sub[3][3];
+			int r = 0;
 
-	float inverseDet = 1.0f / det;
+			// 元の行列を走査
+			for (int row = 0; row < 4; ++row) {
+				if (row == i) continue;
+				int c = 0;
 
-	result.m[0][0] =
-		(m.m[1][1] * (m.m[2][2] * m.m[3][3] - m.m[2][3] * m.m[3][2])
-			- m.m[1][2] * (m.m[2][1] * m.m[3][3] - m.m[2][3] * m.m[3][1])
-			+ m.m[1][3] * (m.m[2][1] * m.m[3][2] - m.m[2][2] * m.m[3][1])) * inverseDet;
-	result.m[0][1] =
-		-(m.m[0][1] * (m.m[2][2] * m.m[3][3] - m.m[2][3] * m.m[3][2])
-			- m.m[0][2] * (m.m[2][1] * m.m[3][3] - m.m[2][3] * m.m[3][1])
-			+ m.m[0][3] * (m.m[2][1] * m.m[3][2] - m.m[2][2] * m.m[3][1])) * inverseDet;
-	result.m[0][2] =
-		(m.m[0][1] * (m.m[1][2] * m.m[3][3] - m.m[1][3] * m.m[3][2])
-			- m.m[0][2] * (m.m[1][1] * m.m[3][3] - m.m[1][3] * m.m[3][1])
-			+ m.m[0][3] * (m.m[1][1] * m.m[3][2] - m.m[1][2] * m.m[3][1])) * inverseDet;
-	result.m[0][3] =
-		-(m.m[0][1] * (m.m[1][2] * m.m[2][3] - m.m[1][3] * m.m[2][2])
-			- m.m[0][2] * (m.m[1][1] * m.m[2][3] - m.m[1][3] * m.m[2][1])
-			+ m.m[0][3] * (m.m[1][1] * m.m[2][2] - m.m[1][2] * m.m[2][1])) * inverseDet;
+				for (int col = 0; col < 4; ++col) {
+					if (col == j) continue;
+					sub[r][c] = m.m[row][col];
+					c++;
+				}
+				r++;
+			}
 
-	result.m[1][0] =
-		-(m.m[1][0] * (m.m[2][2] * m.m[3][3] - m.m[2][3] * m.m[3][2])
-			- m.m[1][2] * (m.m[2][0] * m.m[3][3] - m.m[2][3] * m.m[3][0])
-			+ m.m[1][3] * (m.m[2][0] * m.m[3][2] - m.m[2][2] * m.m[3][0])) * inverseDet;
-	result.m[1][1] =
-		(m.m[0][0] * (m.m[2][2] * m.m[3][3] - m.m[2][3] * m.m[3][2])
-			- m.m[0][2] * (m.m[2][0] * m.m[3][3] - m.m[2][3] * m.m[3][0])
-			+ m.m[0][3] * (m.m[2][0] * m.m[3][2] - m.m[2][2] * m.m[3][0])) * inverseDet;
-	result.m[1][2] =
-		-(m.m[0][0] * (m.m[1][2] * m.m[3][3] - m.m[1][3] * m.m[3][2])
-			- m.m[0][2] * (m.m[1][0] * m.m[3][3] - m.m[1][3] * m.m[3][0])
-			+ m.m[0][3] * (m.m[1][0] * m.m[3][2] - m.m[1][2] * m.m[3][0])) * inverseDet;
-	result.m[1][3] =
-		(m.m[0][0] * (m.m[1][2] * m.m[2][3] - m.m[1][3] * m.m[2][2])
-			- m.m[0][2] * (m.m[1][0] * m.m[2][3] - m.m[1][3] * m.m[2][0])
-			+ m.m[0][3] * (m.m[1][0] * m.m[2][2] - m.m[1][2] * m.m[2][0])) * inverseDet;
+			// 3x3行列式
+			float minor = Det3(
+				sub[0][0], sub[0][1], sub[0][2],
+				sub[1][0], sub[1][1], sub[1][2],
+				sub[2][0], sub[2][1], sub[2][2]
+			);
 
+			// 符号付き余因子
+			float sign;
+			if ((i + j) % 2 == 0) {
+				sign = 1.0f; 
+			} else {
+				sign = -1.0f;
+			}
 
-	result.m[2][0] =
-		(m.m[1][0] * (m.m[2][1] * m.m[3][3] - m.m[2][3] * m.m[3][1])
-			- m.m[1][1] * (m.m[2][0] * m.m[3][3] - m.m[2][3] * m.m[3][0])
-			+ m.m[1][3] * (m.m[2][0] * m.m[3][1] - m.m[2][1] * m.m[3][0])) * inverseDet;
-	result.m[2][1] =
-		-(m.m[0][0] * (m.m[2][1] * m.m[3][3] - m.m[2][3] * m.m[3][1])
-			- m.m[0][1] * (m.m[2][0] * m.m[3][3] - m.m[2][3] * m.m[3][0])
-			+ m.m[0][3] * (m.m[2][0] * m.m[3][1] - m.m[2][1] * m.m[3][0])) * inverseDet;
-	result.m[2][2] =
-		(m.m[0][0] * (m.m[1][1] * m.m[3][3] - m.m[1][3] * m.m[3][1])
-			- m.m[0][1] * (m.m[1][0] * m.m[3][3] - m.m[1][3] * m.m[3][0])
-			+ m.m[0][3] * (m.m[1][0] * m.m[3][1] - m.m[1][1] * m.m[3][0])) * inverseDet;
-	result.m[2][3] =
-		-(m.m[0][0] * (m.m[1][1] * m.m[2][3] - m.m[1][3] * m.m[2][1])
-			- m.m[0][1] * (m.m[1][0] * m.m[2][3] - m.m[1][3] * m.m[2][0])
-			+ m.m[0][3] * (m.m[1][0] * m.m[2][1] - m.m[1][1] * m.m[2][0])) * inverseDet;
+			cofactor.m[i][j] = sign * minor;
+		}
+	}
+	
+	// 転置行列
+	Matrix4x4 adjugate = {};
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			adjugate.m[i][j] = cofactor.m[j][i];
+		}
+	}
 
+	// 行列式
+	float det = 0.0f;
+	for (int j = 0; j < 4; ++j) {
+		det += m.m[0][j] * cofactor.m[0][j];
+	}
 
-	result.m[3][0] =
-		-(m.m[1][0] * (m.m[2][1] * m.m[3][2] - m.m[2][2] * m.m[3][1])
-			- m.m[1][1] * (m.m[2][0] * m.m[3][2] - m.m[2][2] * m.m[3][0])
-			+ m.m[1][2] * (m.m[2][0] * m.m[3][1] - m.m[2][1] * m.m[3][0])) * inverseDet;
-	result.m[3][1] =
-		(m.m[0][0] * (m.m[2][1] * m.m[3][2] - m.m[2][2] * m.m[3][1])
-			- m.m[0][1] * (m.m[2][0] * m.m[3][2] - m.m[2][2] * m.m[3][0])
-			+ m.m[0][2] * (m.m[2][0] * m.m[3][1] - m.m[2][1] * m.m[3][0])) * inverseDet;
-	result.m[3][2] =
-		-(m.m[0][0] * (m.m[1][1] * m.m[3][2] - m.m[1][2] * m.m[3][1])
-			- m.m[0][1] * (m.m[1][0] * m.m[3][2] - m.m[1][2] * m.m[3][0])
-			+ m.m[0][2] * (m.m[1][0] * m.m[3][1] - m.m[1][1] * m.m[3][0])) * inverseDet;
-	result.m[3][3] =
-		(m.m[0][0] * (m.m[1][1] * m.m[2][2] - m.m[1][2] * m.m[2][1])
-			- m.m[0][1] * (m.m[1][0] * m.m[2][2] - m.m[1][2] * m.m[2][0])
-			+ m.m[0][2] * (m.m[1][0] * m.m[2][1] - m.m[1][1] * m.m[2][0])) * inverseDet;
+	// ゼロチェック
+	if (fabsf(det) < 1e-6f) {
+		return result;
+	}
+
+	// 逆行列
+	float invDet = 1.0f / det;
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			result.m[i][j] = adjugate.m[i][j] * invDet;
+		}
+	}
 
 	return result;
 }
@@ -734,13 +726,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	// 球
-	Sphere sphere{ {0.12f, 0.0f,  0.0f}, 0.6f };
-	Plane plane{ { 0.0f, 1.0f, 0.0f}, 1.0f };
+	Matrix4x4 m1 = {
+		3.2f, 0.7f, 9.6f, 4.4f,
+		5.5f, 1.3f, 7.8f, 2.1f,
+		6.9f, 8.0f, 2.6f, 1.0f,
+		0.5f, 7.2f, 5.1f, 3.3f,
+	};
 
-	// カメラ
-	Vector3 cameraTranslation{0.0f, 1.9f, -6.49f};
-	Vector3 cameraRotate{0.26f, 0.0f, 0.0f};
+	Matrix4x4 m2 = {
+		4.1f, 6.5f, 3.3f, 2.2f,
+		8.8f, 0.6f, 9.9f, 7.7f,
+		1.1f, 5.5f, 6.6f, 0.0f,
+		3.3f, 9.9f, 8.8f, 2.2f,
+	};
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -754,35 +752,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///
 		/// ↓更新処理ここから
 		///
-
-#pragma region ImGui
-		ImGui::Begin("Window");
 		
-		// 球
-		ImGui::DragFloat3("Sphere.Center", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("Sphere.Radius", &sphere.radius, 0.01f);
-
-		// 平面
-		ImGui::DragFloat3("Plame.Normal", &plane.normal.x, 0.01f);
-		plane.normal = Normalize(plane.normal);
-		ImGui::DragFloat("Plane.Distance", &plane.distance, 0.01f);
-
-		ImGui::End();
-#pragma endregion
-
-		Matrix4x4 cameraMatrix =
-			MakeAffineMatrix({ 1,1,1 }, cameraRotate, cameraTranslation);
-
-		Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-
-		// 各種行列の計算
-		Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
-
-		// VPMatrixを作る
-		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
-
-		// ViewportMatrixを作る
-		Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
+		Matrix4x4 resultAdd = Add(m1, m2);
+		Matrix4x4 resultMultiply = Multiply(m1, m2);
+		Matrix4x4 resultSubtract = Subtract(m1, m2);
+		Matrix4x4 inverseM1 = Inverse(m1);
+		Matrix4x4 inverseM2 = Inverse(m2);
+		Matrix4x4 transposeM1 = Transpose(m1);
+		Matrix4x4 transposeM2 = Transpose(m2);
+		Matrix4x4 identity = MakeIdentity4x4();
 
 		///
 		/// ↑更新処理ここまで
@@ -792,18 +770,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		// グリッド
-		DrawGrid(viewProjectionMatrix, viewportMatrix);
+		VectorScreenPrintf(0, 0, resultAdd, "Add");
+		VectorScreenPrintf(0, kRowHeight * 5, resultSubtract, "Subtract");
+		VectorScreenPrintf(0, kRowHeight * 5 * 2, resultMultiply, "Multiply");
+		VectorScreenPrintf(0, kRowHeight * 5 * 3, inverseM1, "inverseM1");
+		VectorScreenPrintf(0, kRowHeight * 5 * 4, inverseM2, "inverseM2");
 
-		// 球
-		if (IsCollision(sphere, plane)) {
-			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
-		} else {
-			DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
-		}
-
-		// 平面
-		DrawPlane(plane, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		VectorScreenPrintf(kColumnWidth * 5, 0, transposeM1, "transposeM1");
+		VectorScreenPrintf(kColumnWidth * 5, kRowHeight * 5, transposeM2, "transposeM2");
+		VectorScreenPrintf(kColumnWidth * 5, kRowHeight * 5 * 2, identity, "identity");
 
 		///
 		/// ↑描画処理ここまで
