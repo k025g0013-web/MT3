@@ -9,7 +9,7 @@
 #include "imgui.h"
 #endif 
 
-const char kWindowTitle[] = "LC1A_16_ツカモトキズナ_MT3_02_02_確認課題";
+const char kWindowTitle[] = "LE2A_16_ツカモトキズナ_MT3_確認課題";
 
 // 行列
 //=========================
@@ -359,6 +359,7 @@ Matrix4x4 MakeRotateYMatrix(float radian) {
 	result.m[0][0] = cosf(radian);
 	result.m[0][2] = -sinf(radian);
 	result.m[1][1] = 1.0f;
+
 	result.m[2][0] = sinf(radian);
 	result.m[2][2] = cosf(radian);
 	result.m[3][3] = 1.0f;
@@ -373,6 +374,7 @@ Matrix4x4 MakeRotateZMatrix(float radian) {
 	result.m[0][0] = cosf(radian);
 	result.m[0][1] = sinf(radian);
 	result.m[1][0] = -sinf(radian);
+
 	result.m[1][1] = cosf(radian);
 	result.m[2][2] = 1.0f;
 	result.m[3][3] = 1.0f;
@@ -496,7 +498,7 @@ Matrix4x4 MakeAffineMatrix(const Vector3 &scale, const Vector3 &rotation, const 
 
 #pragma endregion
 
-#pragma region グリッドと球体と平面
+#pragma region グリッドと球体と点と線と平面
 // Drid表示
 void DrawGrid(const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix) {
 	const float kGridHalfWidth = 2.0f;										// Gridの半分の幅
@@ -624,6 +626,30 @@ Vector3 Perpendicular(const Vector3 &vector) {
 	return { 0.0f, -vector.z, vector.y };
 }
 
+// 正射影ベクトル
+Vector3 Project(const Vector3 &v1, const Vector3 &v2) {
+	float dot = Dot(v1, v2);
+	float lengthSq = Dot(v2, v2);
+
+	float t = dot / lengthSq;
+
+	return Multiply(t, v2);
+}
+
+// 最近接点
+Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
+	Vector3 vector = Subtract(point, segment.origin);
+
+	float t = Dot(vector, segment.diff) / Dot(segment.diff, segment.diff);
+	if (t < 0.0f) {
+		t = 0.0f;
+	} else if (t > 1.0f) {
+		t = 1.0f;
+	}
+
+	return Add(segment.origin, Multiply(t, segment.diff));
+}
+
 // 平面表示
 void DrawPlane(const Plane &plane, const Matrix4x4 &viewPrijectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
 	// 中心点を決める
@@ -660,31 +686,6 @@ void DrawPlane(const Plane &plane, const Matrix4x4 &viewPrijectionMatrix, const 
 		);
 	}
 }
-
-// 正射影ベクトル
-Vector3 Project(const Vector3 &v1, const Vector3 &v2) {
-	float dot = Dot(v1, v2);
-	float lengthSq = Dot(v2, v2);
-
-	float t = dot / lengthSq;
-
-	return Multiply(t, v2);
-}
-
-// 最近接点
-Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
-	Vector3 vector = Subtract(point, segment.origin);
-
-	float t = Dot(vector, segment.diff) / Dot(segment.diff, segment.diff);
-	if (t < 0.0f) {
-		t = 0.0f;
-	} else if (t > 1.0f) {
-		t = 1.0f;
-	}
-
-	return Add(segment.origin, Multiply(t, segment.diff));
-}
-
 #pragma endregion
 
 #pragma region 当たり判定
@@ -726,10 +727,6 @@ bool IsCollision(const Segment &segment, const Plane &plane) {
 
 #pragma endregion
 
-#pragma region 点と線
-
-#pragma endregion 
-
 static const float kWindowWidth = 1280.0f;
 static const float kWindowHeight = 720.0f;
 
@@ -745,15 +742,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	// 線
-	Segment segment{ {-0.45f, 0.33f, 0.0f}, {1.0f, 0.58f, 0.0f} };
-
-	// 平面
-	Plane plane{ { 0.0f, 1.0f, 0.0f}, 1.0f };
-
-	// カメラ
-	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
-	Vector3 cameraRotate{ 0.26f, 0.0f, 0.0f };
+	Vector3 rotate{ 0.4f, 1.43f, -0.8f };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -768,38 +757,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓更新処理ここから
 		///
 
-#pragma region ImGui
-		ImGui::Begin("Window");
-
-		// 平面
-		ImGui::DragFloat3("Plame.Normal", &plane.normal.x, 0.01f);
-		plane.normal = Normalize(plane.normal);
-		ImGui::DragFloat("Plane.Distance", &plane.distance, 0.01f);
-
-		// 線
-		ImGui::DragFloat3("Segment.Origin", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("Segment.Diff", &segment.diff.x, 0.01f);
-
-		// カメラ
-		ImGui::DragFloat3("CameraTranslate", &cameraTranslation.x, 0.01f);
-		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-
-		ImGui::End();
-#pragma endregion
-
-		Matrix4x4 cameraMatrix =
-			MakeAffineMatrix({ 1,1,1 }, cameraRotate, cameraTranslation);
-
-		Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-
-		// 各種行列の計算
-		Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kWindowWidth) / float(kWindowHeight), 0.1f, 100.0f);
-
-		// VPMatrixを作る
-		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
-
-		// ViewportMatrixを作る
-		Matrix4x4 viewportMatrix = MakeViewportMatrix(0, 0, float(kWindowWidth), float(kWindowHeight), 0.0f, 1.0f);
+		Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
+		Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
+		Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
+		Matrix4x4 rotateXYZMatrix = Multiply(rotateXMatrix, Multiply(rotateYMatrix, rotateZMatrix));
 
 		///
 		/// ↑更新処理ここまで
@@ -809,21 +770,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		// グリッド
-		DrawGrid(viewProjectionMatrix, viewportMatrix);
-
-		// 球
-		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
-		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
-
-		if (IsCollision(segment, plane)) {
-			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFF0000FF);
-		} else {
-			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFFFFFFFF);
-		}
-
-		// 平面
-		DrawPlane(plane, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		MatrixScreenPrintf(0, 0, rotateXMatrix, "rotateXMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5, rotateYMatrix, "rotateYMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5 * 2, rotateZMatrix, "rotateZMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5 * 3, rotateXYZMatrix, "rotateXYZMatrix");
 
 		///
 		/// ↑描画処理ここまで
