@@ -63,7 +63,7 @@ void VectorScreenPrintf(int x, int y, const Vector3 &vector, const char *label) 
 	Novice::ScreenPrintf(x + kColumnWidth * 3, y, "%s", label);
 }
 
-void VectorScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
+void MatrixScreenPrintf(int x, int y, const Matrix4x4 &matrix, const char *label) {
 	Novice::ScreenPrintf(x, y, "%s", label);
 
 	for (int row = 0; row < 4; ++row) {
@@ -72,20 +72,6 @@ void VectorScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
 				x + column * kColumnWidth,
 				y + row * kRowHeight + 20,
 				"%6.02f", matrix.m[row][column]
-			);
-		}
-	}
-}
-
-void MatrixScreenPrintf(int x, int y, Matrix4x4 &matrix, const char *label) {
-	Novice::ScreenPrintf(x, y, "%s", label);
-
-	for (int row = 0; row < 4; ++row) {
-		for (int col = 0; col < 4; ++col) {
-			Novice::ScreenPrintf(
-				x + col * kColumnWidth,
-				y + row * kRowHeight + 20,
-				"%6.02f", matrix.m[row][col]
 			);
 		}
 	}
@@ -342,11 +328,11 @@ Matrix4x4 MakeRotateXMatrix(float radian) {
 	Matrix4x4 result = {};
 
 	result.m[0][0] = 1.0f;
-	result.m[1][1] = cosf(radian);
-	result.m[1][2] = sinf(radian);
+	result.m[1][1] = std::cos(radian);
+	result.m[1][2] = std::sin(radian);
 
-	result.m[2][1] = -sinf(radian);
-	result.m[2][2] = cosf(radian);
+	result.m[2][1] = -std::sin(radian);
+	result.m[2][2] = std::cos(radian);
 	result.m[3][3] = 1.0f;
 
 	return result;
@@ -356,12 +342,12 @@ Matrix4x4 MakeRotateXMatrix(float radian) {
 Matrix4x4 MakeRotateYMatrix(float radian) {
 	Matrix4x4 result = {};
 
-	result.m[0][0] = cosf(radian);
-	result.m[0][2] = -sinf(radian);
+	result.m[0][0] = std::cos(radian);
+	result.m[0][2] = -std::sin(radian);
 	result.m[1][1] = 1.0f;
 
-	result.m[2][0] = sinf(radian);
-	result.m[2][2] = cosf(radian);
+	result.m[2][0] = std::sin(radian);
+	result.m[2][2] = std::cos(radian);
 	result.m[3][3] = 1.0f;
 
 	return result;
@@ -371,11 +357,11 @@ Matrix4x4 MakeRotateYMatrix(float radian) {
 Matrix4x4 MakeRotateZMatrix(float radian) {
 	Matrix4x4 result = {};
 
-	result.m[0][0] = cosf(radian);
-	result.m[0][1] = sinf(radian);
-	result.m[1][0] = -sinf(radian);
+	result.m[0][0] = std::cos(radian);
+	result.m[0][1] = std::sin(radian);
+	result.m[1][0] = -std::sin(radian);
 
-	result.m[1][1] = cosf(radian);
+	result.m[1][1] = std::cos(radian);
 	result.m[2][2] = 1.0f;
 	result.m[3][3] = 1.0f;
 
@@ -488,8 +474,8 @@ void DrawGrid(const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMa
 		}
 
 		Novice::DrawLine(
-			(int)startScreen.x, (int)startScreen.y,
-			(int)endScreen.x, (int)endScreen.y,
+			static_cast<int>(startScreen.x), static_cast<int>(startScreen.y),
+			static_cast<int>(endScreen.x), static_cast<int>(endScreen.y),
 			color
 		);
 	}
@@ -513,8 +499,8 @@ void DrawGrid(const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMa
 		}
 
 		Novice::DrawLine(
-			(int)startScreen.x, (int)startScreen.y,
-			(int)endScreen.x, (int)endScreen.y,
+			static_cast<int>(startScreen.x), static_cast<int>(startScreen.y),
+			static_cast<int>(endScreen.x), static_cast<int>(endScreen.y),
 			color
 		);
 	}
@@ -523,15 +509,15 @@ void DrawGrid(const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMa
 // 球表示
 void DrawSphere(const Sphere &sphere, const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
 	const uint32_t kSubdivision = 16;									// 分割数
-	const float kLonEvery = 2.0f * float(M_PI) / float(kSubdivision);	// 経度分割1つ分の角度
-	const float kLatEvery = float(M_PI) / float(kSubdivision);			// 緯度分割1つ分の角度
+	const float kLonEvery = 2.0f * static_cast<float>(M_PI) / static_cast<float>(kSubdivision);	// 経度分割1つ分の角度
+	const float kLatEvery = static_cast<float>(M_PI) / static_cast<float>(kSubdivision);			// 緯度分割1つ分の角度
 
 	// VPVMatrixを作る
 	Matrix4x4 vpvMatrix = Multiply(viewProjectionMatrix, viewportMatrix);
 
 	// 緯度の方向に分割 -pi/2 ~ pi/2
 	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex) {
-		float lat = -float(M_PI) / 2.0f + kLatEvery * latIndex;
+		float lat = -static_cast<float>(M_PI) / 2.0f + kLatEvery * latIndex;
 		float nextLat = lat + kLatEvery;
 
 		// 経度の方向に分割 0 ~ 2pi
@@ -541,21 +527,21 @@ void DrawSphere(const Sphere &sphere, const Matrix4x4 &viewProjectionMatrix, con
 
 			// world座標系でのa,b,cを求める
 			Vector3 a = {
-			   sphere.center.x + sphere.radius * cosf(lat) * cosf(lon),
-			   sphere.center.y + sphere.radius * sinf(lat),
-			   sphere.center.z + sphere.radius * cosf(lat) * sinf(lon)
+			   sphere.center.x + sphere.radius * std::cos(lat) * std::cos(lon),
+			   sphere.center.y + sphere.radius * std::sin(lat),
+			   sphere.center.z + sphere.radius * std::cos(lat) * std::sin(lon)
 			};
 
 			Vector3 b = {
-				sphere.center.x + sphere.radius * cosf(nextLat) * cosf(lon),
-				sphere.center.y + sphere.radius * sinf(nextLat),
-				sphere.center.z + sphere.radius * cosf(nextLat) * sinf(lon)
+				sphere.center.x + sphere.radius * std::cos(nextLat) * std::cos(lon),
+				sphere.center.y + sphere.radius * std::sin(nextLat),
+				sphere.center.z + sphere.radius * std::cos(nextLat) * std::sin(lon)
 			};
 
 			Vector3 c = {
-				sphere.center.x + sphere.radius * cosf(lat) * cosf(nextLon),
-				sphere.center.y + sphere.radius * sinf(lat),
-				sphere.center.z + sphere.radius * cosf(lat) * sinf(nextLon)
+				sphere.center.x + sphere.radius * std::cos(lat) * std::cos(nextLon),
+				sphere.center.y + sphere.radius * std::sin(lat),
+				sphere.center.z + sphere.radius * std::cos(lat) * std::sin(nextLon)
 			};
 
 			// a,b,cをscreen座標系まで変換
@@ -565,13 +551,13 @@ void DrawSphere(const Sphere &sphere, const Matrix4x4 &viewProjectionMatrix, con
 
 			// ab,bcで線を引く
 			Novice::DrawLine(
-				(int)aScreen.x, (int)aScreen.y,
-				(int)bScreen.x, (int)bScreen.y,
+				static_cast<int>(aScreen.x), static_cast<int>(aScreen.y),
+				static_cast<int>(bScreen.x), static_cast<int>(bScreen.y),
 				color
 			);
 			Novice::DrawLine(
-				(int)aScreen.x, (int)aScreen.y,
-				(int)cScreen.x, (int)cScreen.y,
+				static_cast<int>(aScreen.x), static_cast<int>(aScreen.y),
+				static_cast<int>(cScreen.x), static_cast<int>(cScreen.y),
 				color
 			);
 		}
@@ -611,7 +597,7 @@ Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
 }
 
 // 平面表示
-void DrawPlane(const Plane &plane, const Matrix4x4 &viewPrijectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
+void DrawPlane(const Plane &plane, const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
 	// 中心点を決める
 	Vector3 center = Multiply(plane.distance, plane.normal);
 
@@ -628,7 +614,7 @@ void DrawPlane(const Plane &plane, const Matrix4x4 &viewPrijectionMatrix, const 
 		// 
 		Vector3 extend = Multiply(2.0f, perpendiculars[index]);
 		Vector3 point = Add(center, extend);
-		points[index] = Transform(Transform(point, viewPrijectionMatrix), viewportMatrix);
+		points[index] = Transform(Transform(point, viewProjectionMatrix), viewportMatrix);
 	}
 
 	// 四頂点を結ぶ
@@ -652,11 +638,7 @@ void DrawPlane(const Plane &plane, const Matrix4x4 &viewPrijectionMatrix, const 
 // 球同士の当たり判定
 bool IsCollision(const Sphere &s1, const Sphere &s2) {
 	float distance = Length(
-		{
-		s2.center.x - s1.center.x,
-		s2.center.y - s1.center.y,
-		s2.center.z - s1.center.z
-		}
+		Subtract(s2.center, s1.center)
 	);
 
 	return distance <= s1.radius + s2.radius;
@@ -702,11 +684,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	Vector3 scale{ 1.2f, 0.79f, -2.1f };
 	Vector3 rotate{ 0.4f, 1.43f, -0.8f };
-	Vector3 translate{ 2.7f, -4.15f, 1.57f };
 
-	Matrix4x4 worldMatrix = MakeAffineMatrix(scale, rotate, translate);
+	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
+	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
+	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
+	Matrix4x4 rotateXYZMatrix = Multiply(Multiply(rotateXMatrix, rotateYMatrix), rotateZMatrix);
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -729,7 +712,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓描画処理ここから
 		///
 
-		MatrixScreenPrintf(0, 0, worldMatrix, "worldMatrix");
+		MatrixScreenPrintf(0, 0, rotateXMatrix, "rotateXMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5, rotateYMatrix, "rotateYMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5 * 2, rotateZMatrix, "rotateZMatrix");
+		MatrixScreenPrintf(0, kRowHeight * 5 * 3, rotateXYZMatrix, "rotateXYZMatrix");
 
 		///
 		/// ↑描画処理ここまで
