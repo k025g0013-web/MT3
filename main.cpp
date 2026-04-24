@@ -48,6 +48,10 @@ struct Plane {
 	float distance;
 };
 
+struct Triangle {
+	Vector3 vertices[3];
+};
+
 // 関数
 //=========================
 #pragma region VectorScreenPrintf
@@ -387,7 +391,7 @@ Matrix4x4 MakeAffineMatrix(const Vector3 &scale, const Vector3 &rotation, const 
 Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip) {
 	Matrix4x4 result = {};
 
-	float fov = 1.0f / tanf(fovY / 2.0f);
+	float fov = 1.0f / std::tan(fovY / 2.0f);
 
 	result.m[0][0] = fov / aspectRatio;
 	result.m[1][1] = fov;
@@ -443,7 +447,7 @@ Vector3 Cross(const Vector3 &v1, const Vector3 &v2) {
 
 #pragma endregion
 
-#pragma region グリッドと球体と点と線と平面
+#pragma region 描画と点と線
 // Drid表示
 void DrawGrid(const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix) {
 	const float kGridHalfWidth = 2.0f;										// Gridの半分の幅
@@ -571,26 +575,6 @@ Vector3 Perpendicular(const Vector3 &vector) {
 	return { 0.0f, -vector.z, vector.y };
 }
 
-// 正射影ベクトル
-Vector3 Project(const Vector3 &v1, const Vector3 &v2) {
-	float dot = Dot(v1, v2);
-	float lengthSq = Dot(v2, v2);
-
-	float t = dot / lengthSq;
-
-	return Multiply(t, v2);
-}
-
-// 最近接点
-Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
-	Vector3 vector = Subtract(point, segment.origin);
-
-	float t = Dot(vector, segment.diff) / Dot(segment.diff, segment.diff);
-	t = std::clamp(t, 0.0f, 1.0f);
-	
-	return Add(segment.origin, Multiply(t, segment.diff));
-}
-
 // 平面表示
 void DrawPlane(const Plane &plane, const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
 	// 中心点を決める
@@ -627,6 +611,43 @@ void DrawPlane(const Plane &plane, const Matrix4x4 &viewProjectionMatrix, const 
 		);
 	}
 }
+
+// 三角形表示
+void DrawTriangle(const Triangle &triangle, const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
+	// VPVMatrixを作る
+	Matrix4x4 vpvMatrix = Multiply(viewProjectionMatrix, viewportMatrix);
+
+	// スクリーン座標系まで変換
+	Vector3 v0 = Transform(triangle.vertices[0], vpvMatrix);
+	Vector3 v1 = Transform(triangle.vertices[1], vpvMatrix);
+	Vector3 v2 = Transform(triangle.vertices[2], vpvMatrix);
+
+	// 描画
+	Novice::DrawLine(static_cast<int>(v0.x), static_cast<int>(v0.y), static_cast<int>(v1.x), static_cast<int>(v1.y), color);
+	Novice::DrawLine(static_cast<int>(v1.x), static_cast<int>(v1.y), static_cast<int>(v2.x), static_cast<int>(v2.y), color);
+	Novice::DrawLine(static_cast<int>(v2.x), static_cast<int>(v2.y), static_cast<int>(v0.x), static_cast<int>(v0.y), color);
+}
+
+// 正射影ベクトル
+Vector3 Project(const Vector3 &v1, const Vector3 &v2) {
+	float dot = Dot(v1, v2);
+	float lengthSq = Dot(v2, v2);
+
+	float t = dot / lengthSq;
+
+	return Multiply(t, v2);
+}
+
+// 最近接点
+Vector3 ClosestPoint(const Vector3 &point, const Segment &segment) {
+	Vector3 vector = Subtract(point, segment.origin);
+
+	float t = Dot(vector, segment.diff) / Dot(segment.diff, segment.diff);
+	t = std::clamp(t, 0.0f, 1.0f);
+
+	return Add(segment.origin, Multiply(t, segment.diff));
+}
+
 #pragma endregion
 
 #pragma region 当たり判定
@@ -691,6 +712,127 @@ bool IsCollision(const Segment &segment, const Plane &plane) {
 	return (0.0f <= t && t <= 1.0f);
 }
 
+// 三角形と直線の当たり判定
+bool IsCollision(const Triangle &triangle, const Line &line) {
+	// 各辺を結んだベクトル
+	Vector3 v01 = Subtract(triangle.vertices[1], triangle.vertices[0]);
+	Vector3 v12 = Subtract(triangle.vertices[2], triangle.vertices[1]);
+	Vector3 v20 = Subtract(triangle.vertices[0], triangle.vertices[2]);
+
+	// 法線
+	Vector3 normal = Cross(
+		v01, Subtract(triangle.vertices[2], triangle.vertices[0])
+	);
+
+	// 分母
+	float denom = Dot(normal, line.diff);
+
+	// ゼロチェック
+	if (denom == 0.0f) {
+		return false;
+	}
+
+	// t
+	float t = Dot(normal, Subtract(triangle.vertices[0], line.origin)) / denom;
+
+	// 衝突点p
+	Vector3 p = Add(line.origin, Multiply(t, line.diff));
+
+	//各辺を結んだベクトルと、頂点と衝突点pを結んだベクトルのクロス積を求める
+	Vector3 cross01 = Cross(v01, Subtract(p, triangle.vertices[0]));
+	Vector3 cross12 = Cross(v12, Subtract(p, triangle.vertices[1]));
+	Vector3 cross20 = Cross(v20, Subtract(p, triangle.vertices[2]));
+
+	// 全ての小三角形のクロス積と法線が同じ方向を向いていたら衝突
+	return Dot(cross01, normal) >= 0 &&
+		Dot(cross12, normal) >= 0 &&
+		Dot(cross20, normal) >= 0;
+}
+
+// 三角形と半線の当たり判定
+bool IsCollision(const Triangle &triangle, const Ray &ray) {
+	// 各辺を結んだベクトル
+	Vector3 v01 = Subtract(triangle.vertices[1], triangle.vertices[0]);
+	Vector3 v12 = Subtract(triangle.vertices[2], triangle.vertices[1]);
+	Vector3 v20 = Subtract(triangle.vertices[0], triangle.vertices[2]);
+
+	// 法線
+	Vector3 normal = Cross(
+		v01, Subtract(triangle.vertices[2], triangle.vertices[0])
+	);
+
+	// 分母
+	float denom = Dot(normal, ray.diff);
+
+	// ゼロチェック
+	if (denom == 0.0f) {
+		return false;
+	}
+
+	// t
+	float t = Dot(normal, Subtract(triangle.vertices[0], ray.origin)) / denom;
+
+	// 判定制限
+	if (t < 0.0f) {
+		return false;
+	}
+
+	// 衝突点p
+	Vector3 p = Add(ray.origin, Multiply(t, ray.diff));
+
+	//各辺を結んだベクトルと、頂点と衝突点pを結んだベクトルのクロス積を求める
+	Vector3 cross01 = Cross(v01, Subtract(p, triangle.vertices[0]));
+	Vector3 cross12 = Cross(v12, Subtract(p, triangle.vertices[1]));
+	Vector3 cross20 = Cross(v20, Subtract(p, triangle.vertices[2]));
+
+	// 全ての小三角形のクロス積と法線が同じ方向を向いていたら衝突
+	return Dot(cross01, normal) >= 0 &&
+		Dot(cross12, normal) >= 0 &&
+		Dot(cross20, normal) >= 0;
+}
+
+// 三角形と線分の当たり判定
+bool IsCollision(const Triangle &triangle, const Segment &segment) {
+	// 各辺を結んだベクトル
+	Vector3 v01 = Subtract(triangle.vertices[1], triangle.vertices[0]);
+	Vector3 v12 = Subtract(triangle.vertices[2], triangle.vertices[1]);
+	Vector3 v20 = Subtract(triangle.vertices[0], triangle.vertices[2]);
+
+	// 法線
+	Vector3 normal = Cross(
+		v01, Subtract(triangle.vertices[2], triangle.vertices[0])
+	);
+
+	// 分母
+	float denom = Dot(normal, segment.diff);
+
+	// ゼロチェック
+	if (denom == 0.0f) {
+		return false;
+	}
+
+	// t
+	float t = Dot(normal, Subtract(triangle.vertices[0], segment.origin)) / denom;
+
+	// 判定制限
+	if (t < 0.0f || t > 1.0f) {
+		return false;
+	}
+
+	// 衝突点p
+	Vector3 p = Add(segment.origin, Multiply(t, segment.diff));
+	
+	//各辺を結んだベクトルと、頂点と衝突点pを結んだベクトルのクロス積を求める
+	Vector3 cross01 = Cross(v01, Subtract(p, triangle.vertices[0]));
+	Vector3 cross12 = Cross(v12, Subtract(p, triangle.vertices[1]));
+	Vector3 cross20 = Cross(v20, Subtract(p, triangle.vertices[2]));
+
+	// 全ての小三角形のクロス積と法線が同じ方向を向いていたら衝突
+	return Dot(cross01, normal) >= 0 &&
+		   Dot(cross12, normal) >= 0 && 
+		   Dot(cross20, normal) >= 0;
+}
+
 #pragma endregion
 
 static const float kWindowWidth = 1280.0f;
@@ -708,15 +850,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
+	// 三角形
+	Triangle triangle{
+		{ { -1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } }
+	};
+
 	// 線
-	Segment segment{ {-0.45f, 0.33f, 0.0f}, {1.0f, 0.58f, 0.0f} };
+	Segment segment{ {0.0f, 0.0f, -1.0f}, {0.0f, 0.5f, 2.0f} };
 
 	// 平面
 	Plane plane{ { 0.0f, 1.0f, 0.0f}, 1.0f };
 
 	// カメラ
-	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
-	Vector3 cameraRotate{ 0.26f, 0.0f, 0.0f };
+	Vector3 cameraTranslation{ 3.3f, 2.2f, -6.5f };
+	Vector3 cameraRotate{ 0.3f, -0.5f, 0.0f };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -734,18 +881,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region ImGui
 		ImGui::Begin("Window");
 
-		// 平面
-		ImGui::DragFloat3("Plane.Normal", &plane.normal.x, 0.01f);
-		plane.normal = Normalize(plane.normal);
-		ImGui::DragFloat("Plane.Distance", &plane.distance, 0.01f);
+		// 三角形
+		ImGui::DragFloat3("Triangle.v0", &triangle.vertices[0].x, 0.01f);
+		ImGui::DragFloat3("Triangle.v1", &triangle.vertices[1].x, 0.01f);
+		ImGui::DragFloat3("Triangle.v2", &triangle.vertices[2].x, 0.01f);
 
 		// 線
 		ImGui::DragFloat3("Segment.Origin", &segment.origin.x, 0.01f);
 		ImGui::DragFloat3("Segment.Diff", &segment.diff.x, 0.01f);
-
-		// カメラ
-		ImGui::DragFloat3("CameraTranslate", &cameraTranslation.x, 0.01f);
-		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
 
 		ImGui::End();
 #pragma endregion
@@ -775,18 +918,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// グリッド
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		// 球
+		// 線
 		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
 		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
-
-		if (IsCollision(segment, plane)) {
+		if (IsCollision(triangle, segment)) {
 			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFF0000FF);
 		} else {
 			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFFFFFFFF);
 		}
 
-		// 平面
-		DrawPlane(plane, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		// 三角形
+		DrawTriangle(triangle, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
