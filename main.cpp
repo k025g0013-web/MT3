@@ -942,6 +942,22 @@ bool IsCollision(const AABB &aabb1, const AABB &aabb2) {
 		   (aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z);
 }
 
+// AABBと球の当たり判定
+bool IsCollision(const AABB &aabb, const Sphere &sphere) {
+	// 最近接点を求める
+	Vector3 closestPoint{
+		std::clamp(sphere.center.x, aabb.min.x, aabb.max.x),
+		std::clamp(sphere.center.y, aabb.min.y, aabb.max.y),
+		std::clamp(sphere.center.z, aabb.min.z, aabb.max.z),
+	};
+
+	// 最近接点と弾の中心の距離を求める
+	float distance = Length(Subtract(closestPoint, sphere.center));
+
+	// 距離が半径よりも小さければ衝突
+	return distance <= sphere.radius;
+}
+
 #pragma endregion
 
 static const float kWindowWidth = 1280.0f;
@@ -960,19 +976,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/* 変数の初期化
 	---------------*/
 	// AABB
-	AABB aabb1{
+	AABB aabb{
 		.min{-0.5f, -0.5f, -0.5f},
 		.max{ 0.0f,  0.0f,  0.0f},
 	};
 
-	AABB aabb2{
-		.min{ 0.2f,  0.2f,  0.2f},
-		.max{ 1.0f,  1.0f,  1.0f},
+	// 球
+	Sphere sphere{ 
+		.center{1.0f, 1.0f,  1.0f}, 
+		.radius = 1.0f,
 	};
 
 	// カメラ
-	Vector3 cameraTranslation{ 3.3f, 2.2f, -6.5f };
-	Vector3 cameraRotate{ 0.3f, -0.5f, 0.0f };
+	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
+	Vector3 cameraRotate{ 0.26f, 0.0f, 0.0f };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -993,12 +1010,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::Begin("Window");
 
 		// AABB
-		ImGui::DragFloat3("aabb1.min", &aabb1.min.x, 0.01f);
-		ImGui::DragFloat3("aabb1.max", &aabb1.max.x, 0.01f);
-		Normalize(aabb1);
-		ImGui::DragFloat3("aabb2.min", &aabb2.min.x, 0.01f);
-		ImGui::DragFloat3("aabb2.max", &aabb2.max.x, 0.01f);
-		Normalize(aabb2);
+		ImGui::DragFloat3("aabb.min", &aabb.min.x, 0.01f);
+		ImGui::DragFloat3("aabb.max", &aabb.max.x, 0.01f);
+		Normalize(aabb);
+	
+		// 球
+		ImGui::DragFloat3("sphere.center", &sphere.center.x, 0.01f);
+		ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
 
 		ImGui::End();
 #pragma endregion
@@ -1031,13 +1049,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
 		// AABB
-		if (IsCollision(aabb1, aabb2)) {
-			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
+		if (IsCollision(aabb, sphere)) {
+			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
 		} else {
-			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 		}
 
-		DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		// 球
+		DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
