@@ -995,8 +995,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// AABB
 		ImGui::DragFloat3("aabb1.min", &aabb1.min.x, 0.01f);
 		ImGui::DragFloat3("aabb1.max", &aabb1.max.x, 0.01f);
+		Normalize(aabb1);
 		ImGui::DragFloat3("aabb2.min", &aabb2.min.x, 0.01f);
 		ImGui::DragFloat3("aabb2.max", &aabb2.max.x, 0.01f);
+		Normalize(aabb2);
 
 		ImGui::End();
 #pragma endregion
