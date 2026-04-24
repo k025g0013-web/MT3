@@ -52,6 +52,11 @@ struct Triangle {
 	Vector3 vertices[3];
 };
 
+struct AABB {
+	Vector3 min;
+	Vector3 max;
+};
+
 // 関数
 //=========================
 #pragma region VectorScreenPrintf
@@ -447,7 +452,7 @@ Vector3 Cross(const Vector3 &v1, const Vector3 &v2) {
 
 #pragma endregion
 
-#pragma region 描画と点と線
+#pragma region 描画と点と線とAABB
 // Drid表示
 void DrawGrid(const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix) {
 	const float kGridHalfWidth = 2.0f;										// Gridの半分の幅
@@ -590,7 +595,6 @@ void DrawPlane(const Plane &plane, const Matrix4x4 &viewProjectionMatrix, const 
 	// 四頂点を求める
 	Vector3 points[4]{};
 	for (int32_t index = 0; index < 4; ++index) {
-		// 
 		Vector3 extend = Multiply(2.0f, perpendiculars[index]);
 		Vector3 point = Add(center, extend);
 		points[index] = Transform(Transform(point, viewProjectionMatrix), viewportMatrix);
@@ -626,6 +630,103 @@ void DrawTriangle(const Triangle &triangle, const Matrix4x4 &viewProjectionMatri
 	Novice::DrawLine(static_cast<int>(v0.x), static_cast<int>(v0.y), static_cast<int>(v1.x), static_cast<int>(v1.y), color);
 	Novice::DrawLine(static_cast<int>(v1.x), static_cast<int>(v1.y), static_cast<int>(v2.x), static_cast<int>(v2.y), color);
 	Novice::DrawLine(static_cast<int>(v2.x), static_cast<int>(v2.y), static_cast<int>(v0.x), static_cast<int>(v0.y), color);
+}
+
+// AABB正規化
+AABB Normalize(const AABB &aabb) {
+	AABB result;
+
+	result.min.x = (std::min)(aabb.min.x, aabb.max.x);
+	result.max.x = (std::max)(aabb.min.x, aabb.max.x);
+
+	result.min.y = (std::min)(aabb.min.y, aabb.max.y);
+	result.max.y = (std::max)(aabb.min.y, aabb.max.y);
+
+	result.min.z = (std::min)(aabb.min.z, aabb.max.z);
+	result.max.z = (std::max)(aabb.min.z, aabb.max.z);
+
+	return result;
+}
+
+// AABB表示
+void DrawAABB(const AABB &aabb, const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
+	// VPVMatrixを作る
+	Matrix4x4 vpvMatrix = Multiply(viewProjectionMatrix, viewportMatrix);
+
+	// ワールド座標での八頂点を求める
+	Vector3 worldVertices[8] = {
+		{aabb.min.x, aabb.min.y, aabb.min.z}, // 0
+		{aabb.max.x, aabb.min.y, aabb.min.z}, // 1
+		{aabb.max.x, aabb.max.y, aabb.min.z}, // 2
+		{aabb.min.x, aabb.max.y, aabb.min.z}, // 3
+
+		{aabb.min.x, aabb.min.y, aabb.max.z}, // 4
+		{aabb.max.x, aabb.min.y, aabb.max.z}, // 5
+		{aabb.max.x, aabb.max.y, aabb.max.z}, // 6
+		{aabb.min.x, aabb.max.y, aabb.max.z}  // 7
+	};
+
+	// スクリーン座標まで変換
+	Vector3 screenVertex[8];
+	for (int i = 0; i < 8; i++) {
+		screenVertex[i] = Transform(worldVertices[i], vpvMatrix);
+	}
+
+
+#pragma region 描画処理
+	// 手前面
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[0].x), static_cast<int>(screenVertex[0].y), 
+		static_cast<int>(screenVertex[1].x), static_cast<int>(screenVertex[1].y), color
+	);
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[1].x), static_cast<int>(screenVertex[1].y), 
+		static_cast<int>(screenVertex[2].x), static_cast<int>(screenVertex[2].y), color);
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[2].x), static_cast<int>(screenVertex[2].y), 
+		static_cast<int>(screenVertex[3].x), static_cast<int>(screenVertex[3].y), color
+	);
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[3].x), static_cast<int>(screenVertex[3].y), 
+		static_cast<int>(screenVertex[0].x), static_cast<int>(screenVertex[0].y), color
+	);
+
+	// 奥面
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[4].x), static_cast<int>(screenVertex[4].y), 
+		static_cast<int>(screenVertex[5].x), static_cast<int>(screenVertex[5].y), color
+	);
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[5].x), static_cast<int>(screenVertex[5].y), 
+		static_cast<int>(screenVertex[6].x), static_cast<int>(screenVertex[6].y), color
+	);
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[6].x), static_cast<int>(screenVertex[6].y), 
+		static_cast<int>(screenVertex[7].x), static_cast<int>(screenVertex[7].y), color
+	);
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[7].x), static_cast<int>(screenVertex[7].y), 
+		static_cast<int>(screenVertex[4].x), static_cast<int>(screenVertex[4].y), color
+	);
+
+	// 側面
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[0].x), static_cast<int>(screenVertex[0].y), 
+		static_cast<int>(screenVertex[4].x), static_cast<int>(screenVertex[4].y), color
+	);
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[1].x), static_cast<int>(screenVertex[1].y), 
+		static_cast<int>(screenVertex[5].x), static_cast<int>(screenVertex[5].y), color
+	);
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[2].x), static_cast<int>(screenVertex[2].y), 
+		static_cast<int>(screenVertex[6].x), static_cast<int>(screenVertex[6].y), color
+	);
+	Novice::DrawLine(
+		static_cast<int>(screenVertex[3].x), static_cast<int>(screenVertex[3].y), 
+		static_cast<int>(screenVertex[7].x), static_cast<int>(screenVertex[7].y), color
+	);
+#pragma endregion
 }
 
 // 正射影ベクトル
@@ -833,6 +934,14 @@ bool IsCollision(const Triangle &triangle, const Segment &segment) {
 		   Dot(cross20, normal) >= 0;
 }
 
+// AABB同士の当たり判定
+bool IsCollision(const AABB &aabb1, const AABB &aabb2) {
+	// 衝突判定
+	return (aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
+		   (aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
+		   (aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z);
+}
+
 #pragma endregion
 
 static const float kWindowWidth = 1280.0f;
@@ -850,16 +959,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	// 三角形
-	Triangle triangle{
-		{ { -1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f, 0.0f } }
+	// AABB
+	AABB aabb1{
+		.min{-0.5f, -0.5f, -0.5f},
+		.max{ 0.0f,  0.0f,  0.0f},
 	};
 
-	// 線
-	Segment segment{ {0.0f, 0.0f, -1.0f}, {0.0f, 0.5f, 2.0f} };
-
-	// 平面
-	Plane plane{ { 0.0f, 1.0f, 0.0f}, 1.0f };
+	AABB aabb2{
+		.min{ 0.2f,  0.2f,  0.2f},
+		.max{ 1.0f,  1.0f,  1.0f},
+	};
 
 	// カメラ
 	Vector3 cameraTranslation{ 3.3f, 2.2f, -6.5f };
@@ -878,21 +987,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// ↓更新処理ここから
 		///
 
+		/* ImGui
+		---------------*/
 #pragma region ImGui
 		ImGui::Begin("Window");
 
-		// 三角形
-		ImGui::DragFloat3("Triangle.v0", &triangle.vertices[0].x, 0.01f);
-		ImGui::DragFloat3("Triangle.v1", &triangle.vertices[1].x, 0.01f);
-		ImGui::DragFloat3("Triangle.v2", &triangle.vertices[2].x, 0.01f);
-
-		// 線
-		ImGui::DragFloat3("Segment.Origin", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("Segment.Diff", &segment.diff.x, 0.01f);
+		// AABB
+		ImGui::DragFloat3("aabb1.min", &aabb1.min.x, 0.01f);
+		ImGui::DragFloat3("aabb1.max", &aabb1.max.x, 0.01f);
+		ImGui::DragFloat3("aabb2.min", &aabb2.min.x, 0.01f);
+		ImGui::DragFloat3("aabb2.max", &aabb2.max.x, 0.01f);
 
 		ImGui::End();
 #pragma endregion
 
+		/* カメラ処理
+		---------------*/
 		Matrix4x4 cameraMatrix =
 			MakeAffineMatrix({ 1,1,1 }, cameraRotate, cameraTranslation);
 
@@ -918,17 +1028,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// グリッド
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		// 線
-		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
-		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
-		if (IsCollision(triangle, segment)) {
-			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFF0000FF);
+		// AABB
+		if (IsCollision(aabb1, aabb2)) {
+			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
 		} else {
-			Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), 0xFFFFFFFF);
+			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 		}
 
-		// 三角形
-		DrawTriangle(triangle, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
