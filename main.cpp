@@ -1245,7 +1245,7 @@ bool IsCollision(const OBB &obb, const Ray &ray) {
 	return IsCollision(localAABB, localRay);
 }
 
-// OBBと半線の当たり判定
+// OBBと線分の当たり判定
 bool IsCollision(const OBB &obb, const Segment &segment) {
 	//	OBBのWorldMatrixを作る
 	Matrix4x4 worldMatrix = MakeIdentity4x4();
