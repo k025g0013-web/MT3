@@ -251,7 +251,7 @@ Matrix4x4 Inverse(const Matrix4x4 &m) {
 	}
 
 	// ゼロチェック
-	if (det == 0.0f) {
+	if (fabs(det) < 1e-4f) {
 		return result;
 	}
 
@@ -774,7 +774,7 @@ bool IsCollision(const Line &line, const Plane &plane) {
 	float dot = Dot(plane.normal, line.diff);
 
 	// ゼロチェック
-	if (dot == 0.0f) {
+	if (fabs(dot) < 1e-4f) {
 		return false;
 	}
 
@@ -787,7 +787,7 @@ bool IsCollision(const Ray &ray, const Plane &plane) {
 	float dot = Dot(plane.normal, ray.diff);
 
 	// ゼロチェック
-	if (dot == 0.0f) {
+	if (fabs(dot) < 1e-4f) {
 		return false;
 	}
 
@@ -803,7 +803,7 @@ bool IsCollision(const Segment &segment, const Plane &plane) {
 	float dot = Dot(plane.normal, segment.diff);
 
 	// ゼロチェック
-	if (dot == 0.0f) {
+	if (fabs(dot) < 1e-4f) {
 		return false;
 	}
 
@@ -829,7 +829,7 @@ bool IsCollision(const Triangle &triangle, const Line &line) {
 	float denom = Dot(normal, line.diff);
 
 	// ゼロチェック
-	if (denom == 0.0f) {
+	if (fabs(denom) < 1e-4f) {
 		return false;
 	}
 
@@ -866,7 +866,7 @@ bool IsCollision(const Triangle &triangle, const Ray &ray) {
 	float denom = Dot(normal, ray.diff);
 
 	// ゼロチェック
-	if (denom == 0.0f) {
+	if (fabs(denom) < 1e-4f) {
 		return false;
 	}
 
@@ -908,7 +908,7 @@ bool IsCollision(const Triangle &triangle, const Segment &segment) {
 	float denom = Dot(normal, segment.diff);
 
 	// ゼロチェック
-	if (denom == 0.0f) {
+	if (fabs(denom) < 1e-4f) {
 		return false;
 	}
 
@@ -976,20 +976,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/* 変数の初期化
 	---------------*/
 	// AABB
-	AABB aabb{
+	AABB aabb1{
 		.min{-0.5f, -0.5f, -0.5f},
 		.max{ 0.0f,  0.0f,  0.0f},
 	};
 
-	// 球
-	Sphere sphere{ 
-		.center{1.0f, 1.0f,  1.0f}, 
-		.radius = 1.0f,
+	AABB aabb2{
+		.min{ 0.2f,  0.2f,  0.2f},
+		.max{ 1.0f,  1.0f,  1.0f},
 	};
 
 	// カメラ
-	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
-	Vector3 cameraRotate{ 0.26f, 0.0f, 0.0f };
+	Vector3 cameraTranslation{ 3.3f, 2.2f, -6.5f };
+	Vector3 cameraRotate{ 0.3f, -0.5f, 0.0f };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -1010,13 +1009,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::Begin("Window");
 
 		// AABB
-		ImGui::DragFloat3("aabb.min", &aabb.min.x, 0.01f);
-		ImGui::DragFloat3("aabb.max", &aabb.max.x, 0.01f);
-		Normalize(aabb);
-	
-		// 球
-		ImGui::DragFloat3("sphere.center", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
+		ImGui::DragFloat3("aabb1.min", &aabb1.min.x, 0.01f);
+		ImGui::DragFloat3("aabb1.max", &aabb1.max.x, 0.01f);
+		aabb1 = Normalize(aabb1);
+
+		ImGui::DragFloat3("aabb2.min", &aabb2.min.x, 0.01f);
+		ImGui::DragFloat3("aabb2.max", &aabb2.max.x, 0.01f);
+		aabb2 = Normalize(aabb2);
 
 		ImGui::End();
 #pragma endregion
@@ -1049,14 +1048,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
 		// AABB
-		if (IsCollision(aabb, sphere)) {
-			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
+		if (IsCollision(aabb1, aabb2)) {
+			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
 		} else {
-			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 		}
 
-		// 球
-		DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
