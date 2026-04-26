@@ -57,6 +57,12 @@ struct AABB {
 	Vector3 max;
 };
 
+struct OBB {
+	Vector3 center;
+	Vector3 orientations[3];
+	Vector3 size;
+};
+
 // 関数
 //=========================
 #pragma region VectorScreenPrintf
@@ -452,7 +458,7 @@ Vector3 Cross(const Vector3 &v1, const Vector3 &v2) {
 
 #pragma endregion
 
-#pragma region 描画と点と線とAABB
+#pragma region 描画と点と線とAABBとOBB
 // Drid表示
 void DrawGrid(const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix) {
 	const float kGridHalfWidth = 2.0f;										// Gridの半分の幅
@@ -725,6 +731,103 @@ void DrawAABB(const AABB &aabb, const Matrix4x4 &viewProjectionMatrix, const Mat
 	Novice::DrawLine(
 		static_cast<int>(screenVertex[3].x), static_cast<int>(screenVertex[3].y),
 		static_cast<int>(screenVertex[7].x), static_cast<int>(screenVertex[7].y), color
+	);
+#pragma endregion
+}
+
+// OBBの軸
+void UpdateOBBOrientation(OBB &obb, const Vector3 &rotate) {
+	// 回転行列の作成
+	Matrix4x4 rotMat = Multiply(Multiply(MakeRotateXMatrix(rotate.x), MakeRotateYMatrix(rotate.y)), MakeRotateZMatrix(rotate.z));
+
+	// 回転行列の各軸を取り出す
+	obb.orientations[0] = { rotMat.m[0][0], rotMat.m[0][1], rotMat.m[0][2] };
+	obb.orientations[1] = { rotMat.m[1][0], rotMat.m[1][1], rotMat.m[1][2] };
+	obb.orientations[2] = { rotMat.m[2][0], rotMat.m[2][1], rotMat.m[2][2] };
+}
+
+// OBB表示
+void DrawOBB(const OBB &obb, const Matrix4x4 &viewProjectionMatrix, const Matrix4x4 &viewportMatrix, uint32_t color) {
+	// VPVMatrixを作る
+	Matrix4x4 vpvMatrix = Multiply(viewProjectionMatrix, viewportMatrix);
+
+	// 各軸（半サイズ込み）
+	Vector3 axisX = Multiply(obb.size.x, obb.orientations[0]);
+	Vector3 axisY = Multiply(obb.size.y, obb.orientations[1]);
+	Vector3 axisZ = Multiply(obb.size.z, obb.orientations[2]);
+
+	// ワールド座標での八頂点を求める
+	Vector3 worldVertices[8]{
+		Subtract(Subtract(Subtract(obb.center, axisX), axisY), axisZ),	// 0
+		Add(Subtract(Subtract(obb.center, axisY), axisZ), axisX),		// 1
+		Add(Add(Subtract(obb.center, axisZ), axisX), axisY),			// 2
+		Add(Subtract(Subtract(obb.center, axisX), axisZ), axisY),		// 3
+
+		Add(Subtract(Subtract(obb.center, axisX), axisY), axisZ),		// 4
+		Add(Add(Subtract(obb.center, axisY), axisZ), axisX),			// 5
+		Add(Add(Add(obb.center, axisX), axisY), axisZ),					// 6
+		Add(Subtract(Add(obb.center, axisY), axisX), axisZ),			// 7
+	};
+
+	// スクリーン座標まで変換
+	Vector3 screenVertex[8];
+	for (int i = 0; i < 8; i++) {
+		screenVertex[i] = Transform(worldVertices[i], vpvMatrix);
+	}
+
+#pragma region 描画処理
+	// 手前面
+	Novice::DrawLine(
+		(int)screenVertex[0].x, (int)screenVertex[0].y,
+		(int)screenVertex[1].x, (int)screenVertex[1].y, color
+	);
+	Novice::DrawLine(
+		(int)screenVertex[1].x, (int)screenVertex[1].y,
+		(int)screenVertex[2].x, (int)screenVertex[2].y, color
+	);
+	Novice::DrawLine(
+		(int)screenVertex[2].x, (int)screenVertex[2].y,
+		(int)screenVertex[3].x, (int)screenVertex[3].y, color
+	);
+	Novice::DrawLine(
+		(int)screenVertex[3].x, (int)screenVertex[3].y,
+		(int)screenVertex[0].x, (int)screenVertex[0].y, color
+	);
+
+	// 奥面
+	Novice::DrawLine(
+		(int)screenVertex[4].x, (int)screenVertex[4].y,
+		(int)screenVertex[5].x, (int)screenVertex[5].y, color
+	);
+	Novice::DrawLine(
+		(int)screenVertex[5].x, (int)screenVertex[5].y,
+		(int)screenVertex[6].x, (int)screenVertex[6].y, color
+	);
+	Novice::DrawLine(
+		(int)screenVertex[6].x, (int)screenVertex[6].y,
+		(int)screenVertex[7].x, (int)screenVertex[7].y, color
+	);
+	Novice::DrawLine(
+		(int)screenVertex[7].x, (int)screenVertex[7].y,
+		(int)screenVertex[4].x, (int)screenVertex[4].y, color
+	);
+
+	// 側面
+	Novice::DrawLine(
+		(int)screenVertex[0].x, (int)screenVertex[0].y,
+		(int)screenVertex[4].x, (int)screenVertex[4].y, color
+	);
+	Novice::DrawLine(
+		(int)screenVertex[1].x, (int)screenVertex[1].y,
+		(int)screenVertex[5].x, (int)screenVertex[5].y, color
+	);
+	Novice::DrawLine(
+		(int)screenVertex[2].x, (int)screenVertex[2].y,
+		(int)screenVertex[6].x, (int)screenVertex[6].y, color
+	);
+	Novice::DrawLine(
+		(int)screenVertex[3].x, (int)screenVertex[3].y,
+		(int)screenVertex[7].x, (int)screenVertex[7].y, color
 	);
 #pragma endregion
 }
@@ -1045,6 +1148,47 @@ bool IsCollision(const AABB &aabb, const Segment &segment) {
 	// 衝突判定
 	return tmin <= tmax;
 }
+
+// OBBと球の当たり判定
+bool IsCollision(const OBB &obb, const Sphere &sphere) {
+	//	OBBのWorldMatrixを作る
+	Matrix4x4 obbWorld = MakeIdentity4x4();
+	obbWorld.m[0][0] = obb.orientations[0].x;
+	obbWorld.m[0][1] = obb.orientations[0].y;
+	obbWorld.m[0][2] = obb.orientations[0].z;
+
+	obbWorld.m[1][0] = obb.orientations[1].x;
+	obbWorld.m[1][1] = obb.orientations[1].y;
+	obbWorld.m[1][2] = obb.orientations[1].z;
+
+	obbWorld.m[2][0] = obb.orientations[2].x;
+	obbWorld.m[2][1] = obb.orientations[2].y;
+	obbWorld.m[2][2] = obb.orientations[2].z;
+
+	obbWorld.m[3][0] = obb.center.x;
+	obbWorld.m[3][1] = obb.center.y;
+	obbWorld.m[3][2] = obb.center.z;
+
+	// 逆行列
+	Matrix4x4 obbWorldMatrixInverce = Inverse(obbWorld);
+
+	// 中心点をローカル空間上の点にする
+	Vector3 centerInOBBLocalSpace =
+		Transform(sphere.center, obbWorldMatrixInverce);
+
+	// ローカル空間上でのAABB(OBB)と球
+	AABB aabbOBBLocal{ 
+		.min = { -obb.size.x, -obb.size.y, -obb.size.z },
+		.max = {  obb.size.x,  obb.size.y,  obb.size.z },
+	};
+	Sphere sphereOBBLocal{ 
+		.center = centerInOBBLocalSpace, 
+		.radius = sphere.radius
+	};
+
+	// 衝突判定
+	return IsCollision(aabbOBBLocal, sphereOBBLocal);
+}
 #pragma endregion
 
 static const float kWindowWidth = 1280.0f;
@@ -1062,16 +1206,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	// AABB
-	AABB aabb{
-		.min{-0.5f, -0.5f, -0.5f},
-		.max{ 0.5f,  0.5f,  0.5f},
+	// OBB
+	Vector3 rotate{ 0.0f,0.0f,0.0f };
+	OBB obb{
+		.center{ -0.5f,0.0f,0.0f },
+		.orientations = {
+			{ 1.0f,0.0f,0.0f },
+			{ 0.0f,1.0f,0.0f },
+			{ 0.0f,0.0f,1.0f },
+		},
+		.size{ 0.5f,0.5f,0.5f },
 	};
 
-	// 線分
-	Segment segment{
-		.origin{-0.7f, 0.3f,  0.0f},
-		.diff{2.0f, -0.5f, 0.0f},
+	// 球
+	Sphere sphere{
+		.center{ 0.0f,0.0f,0.0f },
+		.radius{0.5f},
 	};
 
 	// カメラ
@@ -1096,14 +1246,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region ImGui
 		ImGui::Begin("Window");
 
-		// AABB
-		ImGui::DragFloat3("aabb.min", &aabb.min.x, 0.01f);
-		ImGui::DragFloat3("aabb.max", &aabb.max.x, 0.01f);
-		aabb = Normalize(aabb);
+		// OBB
+		ImGui::DragFloat3("obb.center", &obb.center.x, 0.01f);
+		ImGui::SliderFloat("rotateX", &rotate.x, -500.0f, 500.0f, "%.0f deg");
+		ImGui::SliderFloat("rotateY", &rotate.y, -500.0f, 500.0f, "%.0f deg");
+		ImGui::SliderFloat("rotateZ", &rotate.z, -500.0f, 500.0f, "%.0f deg");
+		ImGui::InputFloat3("obb.orientations[0]", &obb.orientations[0].x);
+		ImGui::InputFloat3("obb.orientations[1]", &obb.orientations[1].x);
+		ImGui::InputFloat3("obb.orientations[2]", &obb.orientations[2].x);
+		UpdateOBBOrientation(obb, rotate);
+		ImGui::DragFloat3("obb.size", &obb.size.x, 0.01f);
 
-		// 線分
-		ImGui::DragFloat3("segment.origin", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("segment.diff", &segment.diff.x, 0.01f);
+		// 球
+		ImGui::DragFloat3("sphere.center", &sphere.center.x, 0.01f);
+		ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
 
 		ImGui::End();
 #pragma endregion
@@ -1135,18 +1291,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// グリッド
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		// AABB
-		if (IsCollision(aabb, segment)) {
-			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
+		// OBB
+		if (IsCollision(obb, sphere)) {
+			DrawOBB(obb, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
 		} else {
-			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+			DrawOBB(obb, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 		}
 
-		// 線分
-		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
-		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
-
-		Novice::DrawLine(static_cast<int>(start.x), static_cast<int>(start.y), static_cast<int>(end.x), static_cast<int>(end.y), 0xFFFFFFFF);
+		// 球
+		DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
