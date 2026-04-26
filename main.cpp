@@ -676,54 +676,54 @@ void DrawAABB(const AABB &aabb, const Matrix4x4 &viewProjectionMatrix, const Mat
 #pragma region 描画処理
 	// 手前面
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[0].x), static_cast<int>(screenVertex[0].y), 
+		static_cast<int>(screenVertex[0].x), static_cast<int>(screenVertex[0].y),
 		static_cast<int>(screenVertex[1].x), static_cast<int>(screenVertex[1].y), color
 	);
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[1].x), static_cast<int>(screenVertex[1].y), 
+		static_cast<int>(screenVertex[1].x), static_cast<int>(screenVertex[1].y),
 		static_cast<int>(screenVertex[2].x), static_cast<int>(screenVertex[2].y), color);
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[2].x), static_cast<int>(screenVertex[2].y), 
+		static_cast<int>(screenVertex[2].x), static_cast<int>(screenVertex[2].y),
 		static_cast<int>(screenVertex[3].x), static_cast<int>(screenVertex[3].y), color
 	);
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[3].x), static_cast<int>(screenVertex[3].y), 
+		static_cast<int>(screenVertex[3].x), static_cast<int>(screenVertex[3].y),
 		static_cast<int>(screenVertex[0].x), static_cast<int>(screenVertex[0].y), color
 	);
 
 	// 奥面
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[4].x), static_cast<int>(screenVertex[4].y), 
+		static_cast<int>(screenVertex[4].x), static_cast<int>(screenVertex[4].y),
 		static_cast<int>(screenVertex[5].x), static_cast<int>(screenVertex[5].y), color
 	);
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[5].x), static_cast<int>(screenVertex[5].y), 
+		static_cast<int>(screenVertex[5].x), static_cast<int>(screenVertex[5].y),
 		static_cast<int>(screenVertex[6].x), static_cast<int>(screenVertex[6].y), color
 	);
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[6].x), static_cast<int>(screenVertex[6].y), 
+		static_cast<int>(screenVertex[6].x), static_cast<int>(screenVertex[6].y),
 		static_cast<int>(screenVertex[7].x), static_cast<int>(screenVertex[7].y), color
 	);
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[7].x), static_cast<int>(screenVertex[7].y), 
+		static_cast<int>(screenVertex[7].x), static_cast<int>(screenVertex[7].y),
 		static_cast<int>(screenVertex[4].x), static_cast<int>(screenVertex[4].y), color
 	);
 
 	// 側面
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[0].x), static_cast<int>(screenVertex[0].y), 
+		static_cast<int>(screenVertex[0].x), static_cast<int>(screenVertex[0].y),
 		static_cast<int>(screenVertex[4].x), static_cast<int>(screenVertex[4].y), color
 	);
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[1].x), static_cast<int>(screenVertex[1].y), 
+		static_cast<int>(screenVertex[1].x), static_cast<int>(screenVertex[1].y),
 		static_cast<int>(screenVertex[5].x), static_cast<int>(screenVertex[5].y), color
 	);
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[2].x), static_cast<int>(screenVertex[2].y), 
+		static_cast<int>(screenVertex[2].x), static_cast<int>(screenVertex[2].y),
 		static_cast<int>(screenVertex[6].x), static_cast<int>(screenVertex[6].y), color
 	);
 	Novice::DrawLine(
-		static_cast<int>(screenVertex[3].x), static_cast<int>(screenVertex[3].y), 
+		static_cast<int>(screenVertex[3].x), static_cast<int>(screenVertex[3].y),
 		static_cast<int>(screenVertex[7].x), static_cast<int>(screenVertex[7].y), color
 	);
 #pragma endregion
@@ -922,7 +922,7 @@ bool IsCollision(const Triangle &triangle, const Segment &segment) {
 
 	// 衝突点p
 	Vector3 p = Add(segment.origin, Multiply(t, segment.diff));
-	
+
 	//各辺を結んだベクトルと、頂点と衝突点pを結んだベクトルのクロス積を求める
 	Vector3 cross01 = Cross(v01, Subtract(p, triangle.vertices[0]));
 	Vector3 cross12 = Cross(v12, Subtract(p, triangle.vertices[1]));
@@ -930,16 +930,16 @@ bool IsCollision(const Triangle &triangle, const Segment &segment) {
 
 	// 全ての小三角形のクロス積と法線が同じ方向を向いていたら衝突
 	return Dot(cross01, normal) >= 0 &&
-		   Dot(cross12, normal) >= 0 && 
-		   Dot(cross20, normal) >= 0;
+		Dot(cross12, normal) >= 0 &&
+		Dot(cross20, normal) >= 0;
 }
 
 // AABB同士の当たり判定
 bool IsCollision(const AABB &aabb1, const AABB &aabb2) {
 	// 衝突判定
 	return (aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) &&
-		   (aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
-		   (aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z);
+		(aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) &&
+		(aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z);
 }
 
 // AABBと球の当たり判定
@@ -958,6 +958,93 @@ bool IsCollision(const AABB &aabb, const Sphere &sphere) {
 	return distance <= sphere.radius;
 }
 
+// AABBと直線の当たり判定
+bool IsCollision(const AABB &aabb, const Line &line) {
+	// 各軸のt
+	float tNearX = (aabb.min.x - line.origin.x) / line.diff.x;
+	float tFarX = (aabb.max.x - line.origin.x) / line.diff.x;
+
+	float tNearY = (aabb.min.y - line.origin.y) / line.diff.y;
+	float tFarY = (aabb.max.y - line.origin.y) / line.diff.y;
+
+	float tNearZ = (aabb.min.z - line.origin.z) / line.diff.z;
+	float tFarZ = (aabb.max.z - line.origin.z) / line.diff.z;
+
+	// 逆転対応
+	if (tNearX > tFarX) std::swap(tNearX, tFarX);
+	if (tNearY > tFarY) std::swap(tNearY, tFarY);
+	if (tNearZ > tFarZ) std::swap(tNearZ, tFarZ);
+
+	// AABBとの衝突店(貫通点)のtが小さい方
+	float tmin = (std::max)({ tNearX, tNearY, tNearZ });
+	// AABBとの衝突店(貫通点)のtが大きい方
+	float tmax = (std::min)({ tFarX,  tFarY,  tFarZ });
+
+	// 衝突判定
+	return tmin <= tmax;
+}
+
+// AABBと半線の当たり判定
+bool IsCollision(const AABB &aabb, const Ray &ray) {
+	// 各軸のt
+	float tNearX = (aabb.min.x - ray.origin.x) / ray.diff.x;
+	float tFarX = (aabb.max.x - ray.origin.x) / ray.diff.x;
+
+	float tNearY = (aabb.min.y - ray.origin.y) / ray.diff.y;
+	float tFarY = (aabb.max.y - ray.origin.y) / ray.diff.y;
+
+	float tNearZ = (aabb.min.z - ray.origin.z) / ray.diff.z;
+	float tFarZ = (aabb.max.z - ray.origin.z) / ray.diff.z;
+
+	// 逆転対応
+	if (tNearX > tFarX) std::swap(tNearX, tFarX);
+	if (tNearY > tFarY) std::swap(tNearY, tFarY);
+	if (tNearZ > tFarZ) std::swap(tNearZ, tFarZ);
+
+	// AABBとの衝突店(貫通点)のtが小さい方
+	float tmin = (std::max)({ tNearX, tNearY, tNearZ });
+	// AABBとの衝突店(貫通点)のtが大きい方
+	float tmax = (std::min)({ tFarX,  tFarY,  tFarZ });
+
+	// 判定制限
+	if (tmax < 0.0f) {
+		return false;
+	}
+
+	// 衝突判定
+	return tmin <= tmax;
+}
+
+// AABBと線分の当たり判定
+bool IsCollision(const AABB &aabb, const Segment &segment) {
+	// 各軸のt
+	float tNearX = (aabb.min.x - segment.origin.x) / segment.diff.x;
+	float tFarX = (aabb.max.x - segment.origin.x) / segment.diff.x;
+
+	float tNearY = (aabb.min.y - segment.origin.y) / segment.diff.y;
+	float tFarY = (aabb.max.y - segment.origin.y) / segment.diff.y;
+
+	float tNearZ = (aabb.min.z - segment.origin.z) / segment.diff.z;
+	float tFarZ = (aabb.max.z - segment.origin.z) / segment.diff.z;
+
+	// 逆転対応
+	if (tNearX > tFarX) std::swap(tNearX, tFarX);
+	if (tNearY > tFarY) std::swap(tNearY, tFarY);
+	if (tNearZ > tFarZ) std::swap(tNearZ, tFarZ);
+
+	// AABBとの衝突店(貫通点)のtが小さい方
+	float tmin = (std::max)({ tNearX, tNearY, tNearZ });
+	// AABBとの衝突店(貫通点)のtが大きい方
+	float tmax = (std::min)({ tFarX,  tFarY,  tFarZ });
+
+	// 判定制限
+	if (tmax < 0.0f || tmin > 1.0f) {
+		return false;
+	}
+
+	// 衝突判定
+	return tmin <= tmax;
+}
 #pragma endregion
 
 static const float kWindowWidth = 1280.0f;
@@ -978,18 +1065,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// AABB
 	AABB aabb{
 		.min{-0.5f, -0.5f, -0.5f},
-		.max{ 0.0f,  0.0f,  0.0f},
+		.max{ 0.5f,  0.5f,  0.5f},
 	};
 
-	// 球
-	Sphere sphere{
-		.center{1.0f, 1.0f,  1.0f},
-		.radius = 1.0f,
+	// 線分
+	Segment segment{
+		.origin{-0.7f, 0.3f,  0.0f},
+		.diff{2.0f, -0.5f, 0.0f},
 	};
 
 	// カメラ
-	Vector3 cameraTranslation{ 3.3f, 2.2f, -6.5f };
-	Vector3 cameraRotate{ 0.3f, -0.5f, 0.0f };
+	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
+	Vector3 cameraRotate{ 0.26f, 0.0f, 0.0f };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -1014,9 +1101,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::DragFloat3("aabb.max", &aabb.max.x, 0.01f);
 		aabb = Normalize(aabb);
 
-		// 球
-		ImGui::DragFloat3("sphere.center", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
+		// 線分
+		ImGui::DragFloat3("segment.origin", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("segment.diff", &segment.diff.x, 0.01f);
 
 		ImGui::End();
 #pragma endregion
@@ -1049,14 +1136,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
 		// AABB
-		if (IsCollision(aabb, sphere)) {
+		if (IsCollision(aabb, segment)) {
 			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
 		} else {
 			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 		}
 
-		// 球
-		DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		// 線分
+		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
+		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
+
+		Novice::DrawLine(static_cast<int>(start.x), static_cast<int>(start.y), static_cast<int>(end.x), static_cast<int>(end.y), 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
