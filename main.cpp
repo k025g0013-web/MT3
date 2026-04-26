@@ -976,14 +976,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/* 変数の初期化
 	---------------*/
 	// AABB
-	AABB aabb1{
+	AABB aabb{
 		.min{-0.5f, -0.5f, -0.5f},
 		.max{ 0.0f,  0.0f,  0.0f},
 	};
 
-	AABB aabb2{
-		.min{ 0.2f,  0.2f,  0.2f},
-		.max{ 1.0f,  1.0f,  1.0f},
+	// 球
+	Sphere sphere{
+		.center{1.0f, 1.0f,  1.0f},
+		.radius = 1.0f,
 	};
 
 	// カメラ
@@ -1009,13 +1010,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::Begin("Window");
 
 		// AABB
-		ImGui::DragFloat3("aabb1.min", &aabb1.min.x, 0.01f);
-		ImGui::DragFloat3("aabb1.max", &aabb1.max.x, 0.01f);
-		aabb1 = Normalize(aabb1);
+		ImGui::DragFloat3("aabb.min", &aabb.min.x, 0.01f);
+		ImGui::DragFloat3("aabb.max", &aabb.max.x, 0.01f);
+		aabb = Normalize(aabb);
 
-		ImGui::DragFloat3("aabb2.min", &aabb2.min.x, 0.01f);
-		ImGui::DragFloat3("aabb2.max", &aabb2.max.x, 0.01f);
-		aabb2 = Normalize(aabb2);
+		// 球
+		ImGui::DragFloat3("sphere.center", &sphere.center.x, 0.01f);
+		ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
 
 		ImGui::End();
 #pragma endregion
@@ -1048,13 +1049,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
 		// AABB
-		if (IsCollision(aabb1, aabb2)) {
-			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
+		if (IsCollision(aabb, sphere)) {
+			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFF0000FF);
 		} else {
-			DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+			DrawAABB(aabb, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 		}
 
-		DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
+		// 球
+		DrawSphere(sphere, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
