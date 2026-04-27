@@ -134,10 +134,12 @@ float Dot(const Vector3 &v1, const Vector3 &v2) {
 
 // 長さ
 float Length(const Vector3 &v) {
-	float result =
-		sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2));
+	return sqrtf(powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2));
+}
 
-	return result;
+// 長さの二乗
+float LengthSquare(const Vector3 &v) {
+	return powf(v.x, 2) + powf(v.y, 2) + powf(v.z, 2);
 }
 
 // 正規化
@@ -151,6 +153,17 @@ Vector3 Normalize(const Vector3 &v) {
 
 	return result;
 }
+
+// クロス積
+Vector3 Cross(const Vector3 &v1, const Vector3 &v2) {
+	Vector3 result = {};
+
+	result.x = v1.y * v2.z - v1.z * v2.y;
+	result.y = v1.z * v2.x - v1.x * v2.z;
+	result.z = v1.x * v2.y - v1.y * v2.x;
+
+	return result;
+};
 
 // 行列の加法
 Matrix4x4 Add(const Matrix4x4 &m1, const Matrix4x4 &m2) {
@@ -429,17 +442,6 @@ Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, f
 	result.m[3][0] = left + width / 2.0f;
 	result.m[3][1] = top + height / 2.0f;
 	result.m[3][2] = minDepth;
-
-	return result;
-};
-
-// クロス積
-Vector3 Cross(const Vector3 &v1, const Vector3 &v2) {
-	Vector3 result = {};
-
-	result.x = v1.y * v2.z - v1.z * v2.y;
-	result.y = v1.z * v2.x - v1.x * v2.z;
-	result.z = v1.x * v2.y - v1.y * v2.x;
 
 	return result;
 };
@@ -1285,6 +1287,77 @@ bool IsCollision(const OBB &obb, const Segment &segment) {
 	// 衝突判定
 	return IsCollision(localAABB, localSegment);
 }
+
+// 分離軸判定
+bool OverlapOnAxis(const Vector3 &axis, const OBB &obb1, const OBB &obb2) {
+	// OBB1の投影半径
+	float projectionRadius1 =
+		obb1.size.x * fabs(Dot(obb1.orientations[0], axis)) +
+		obb1.size.y * fabs(Dot(obb1.orientations[1], axis)) +
+		obb1.size.z * fabs(Dot(obb1.orientations[2], axis));
+
+	// OBB2の投影半径
+	float projectionRadius2 =
+		obb2.size.x * fabs(Dot(obb2.orientations[0], axis)) +
+		obb2.size.y * fabs(Dot(obb2.orientations[1], axis)) +
+		obb2.size.z * fabs(Dot(obb2.orientations[2], axis));
+
+	// 投影区間
+	float min1 = Dot(obb1.center, axis) - projectionRadius1;
+	float max1 = Dot(obb1.center, axis) + projectionRadius1;
+	
+	float min2 = Dot(obb2.center, axis) - projectionRadius2;
+	float max2 = Dot(obb2.center, axis) + projectionRadius2;
+
+	float sumSpan = (max1 - min1) + (max2 - min2);
+	float longSpan = (std::max)(max1, max2) - (std::min)(min1, min2);
+
+	// 分離判定
+	return longSpan < sumSpan;
+}
+
+// OBB同士の当たり判定
+bool IsCollision(const OBB &obb1, const OBB &obb2) {
+	// 面法線
+	Vector3 axes[15];
+	axes[0] = obb1.orientations[0];
+	axes[1] = obb1.orientations[1];
+	axes[2] = obb1.orientations[2];
+
+	axes[3] = obb2.orientations[0];
+	axes[4] = obb2.orientations[1];
+	axes[5] = obb2.orientations[2];
+
+	// 各辺の組み合わせのクロス積
+	axes[6] = Cross(obb1.orientations[0], obb2.orientations[0]);
+	axes[7] = Cross(obb1.orientations[0], obb2.orientations[1]);
+	axes[8] = Cross(obb1.orientations[0], obb2.orientations[2]);
+
+	axes[9] = Cross(obb1.orientations[1], obb2.orientations[0]);
+	axes[10] = Cross(obb1.orientations[1], obb2.orientations[1]);
+	axes[11] = Cross(obb1.orientations[1], obb2.orientations[2]);
+
+	axes[12] = Cross(obb1.orientations[2], obb2.orientations[0]);
+	axes[13] = Cross(obb1.orientations[2], obb2.orientations[1]);
+	axes[14] = Cross(obb1.orientations[2], obb2.orientations[2]);
+
+	// 各軸チェック
+	for (int i = 0; i < 15; ++i) {
+		// ゼロ軸チェック
+		if (LengthSquare(axes[i]) < 1e-4f) continue;
+
+		// 正規化
+		Vector3 axis = Normalize(axes[i]);
+
+		// 分離軸判定
+		if (!OverlapOnAxis(axis, obb1, obb2)) {
+			return false;
+		}
+	}
+
+	// 衝突判定
+	return true;
+}
 #pragma endregion
 
 static const float kWindowWidth = 1280.0f;
@@ -1303,21 +1376,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	/* 変数の初期化
 	---------------*/
 	// OBB
-	Vector3 rotate{ 0.0f,0.0f,0.0f };
-	OBB obb{
-		.center{ -1.0f,0.0f,0.0f },
+	Vector3 rotate1{ 0.0f,0.0f,0.0f };
+	OBB obb1{
+		.center{ 0.0f,0.0f,0.0f },
 		.orientations = {
 			{ 1.0f,0.0f,0.0f },
 			{ 0.0f,1.0f,0.0f },
 			{ 0.0f,0.0f,1.0f },
 		},
-		.size{ 0.5f,0.5f,0.5f },
+		.size{ 0.83f,0.26f,0.24f },
 	};
 
-	// 線分
-	Segment segment{
-		.origin{ -0.8f,-0.3f,0.0f },
-		.diff{ 0.5f,0.5f,0.5f },
+	Vector3 rotate2{ -0.05f,-2.49f,0.15f };
+	OBB obb2{
+		.center{ 0.9f,0.66f,0.24f },
+		.orientations = {
+			{ 1.0f,0.0f,0.0f },
+			{ 0.0f,1.0f,0.0f },
+			{ 0.0f,0.0f,1.0f },
+		},
+		.size{ 0.5f,0.37f,0.5f },
 	};
 
 	// カメラ
@@ -1343,19 +1421,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::Begin("Window");
 
 		// OBB
-		ImGui::DragFloat3("obb.center", &obb.center.x, 0.01f);
-		ImGui::SliderFloat("rotateX", &rotate.x, -500.0f, 500.0f, "%.0f deg");
-		ImGui::SliderFloat("rotateY", &rotate.y, -500.0f, 500.0f, "%.0f deg");
-		ImGui::SliderFloat("rotateZ", &rotate.z, -500.0f, 500.0f, "%.0f deg");
-		ImGui::InputFloat3("obb.orientations[0]", &obb.orientations[0].x);
-		ImGui::InputFloat3("obb.orientations[1]", &obb.orientations[1].x);
-		ImGui::InputFloat3("obb.orientations[2]", &obb.orientations[2].x);
-		UpdateOBBOrientation(obb, rotate);
-		ImGui::DragFloat3("obb.size", &obb.size.x, 0.01f);
+		ImGui::DragFloat3("obb1.center", &obb1.center.x, 0.01f);
+		ImGui::SliderFloat("obb1.rotateX", &rotate1.x, -500.0f, 500.0f, "%.0f deg");
+		ImGui::SliderFloat("obb1.rotateY", &rotate1.y, -500.0f, 500.0f, "%.0f deg");
+		ImGui::SliderFloat("obb1.rotateZ", &rotate1.z, -500.0f, 500.0f, "%.0f deg");
+		UpdateOBBOrientation(obb1, rotate1);
+		ImGui::DragFloat3("obb1.size", &obb1.size.x, 0.01f);
 
-		// 線分
-		ImGui::DragFloat3("segment.origin", &segment.origin.x, 0.01f);
-		ImGui::DragFloat3("segment.diff", &segment.diff.x, 0.01f);
+		ImGui::DragFloat3("obb2.center", &obb2.center.x, 0.01f);
+		ImGui::SliderFloat("obb2.rotateX", &rotate2.x, -500.0f, 500.0f, "%.0f deg");
+		ImGui::SliderFloat("obb2.rotateY", &rotate2.y, -500.0f, 500.0f, "%.0f deg");
+		ImGui::SliderFloat("obb2.rotateZ", &rotate2.z, -500.0f, 500.0f, "%.0f deg");
+		UpdateOBBOrientation(obb2, rotate2);
+		ImGui::DragFloat3("obb2.size", &obb2.size.x, 0.01f);
 
 		ImGui::End();
 #pragma endregion
@@ -1391,19 +1469,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DrawGrid(vpvMatrix);
 
 		// OBB
-		if (IsCollision(obb, segment)) {
-			DrawOBB(obb, vpvMatrix, 0xFF0000FF);
+		if (IsCollision(obb1, obb2)) {
+			DrawOBB(obb1, vpvMatrix, 0xFF0000FF);
 		} else {
-			DrawOBB(obb, vpvMatrix, 0xFFFFFFFF);
+			DrawOBB(obb1, vpvMatrix, 0xFFFFFFFF);
 		}
 
-		// 線分
-		Vector3 start = Transform(Transform(segment.origin, viewProjectionMatrix), viewportMatrix);
-		Vector3 end = Transform(Transform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
-		Novice::DrawLine(
-			static_cast<int>(start.x), static_cast<int>(start.y), 
-			static_cast<int>(end.x), static_cast<int>(end.y), 0xFFFFFFFF
-		);
+		DrawOBB(obb2, vpvMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
