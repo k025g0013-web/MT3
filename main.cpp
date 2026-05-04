@@ -63,6 +63,11 @@ struct OBB {
 	Vector3 size;
 };
 
+// 定数
+//=========================
+
+const float kEpsilon = 1e-4f;
+
 // 関数
 //=========================
 #pragma region VectorScreenPrintf
@@ -270,7 +275,7 @@ Matrix4x4 Inverse(const Matrix4x4 &m) {
 	}
 
 	// ゼロチェック
-	if (fabs(det) < 1e-4f) {
+	if (fabs(det) < kEpsilon) {
 		return result;
 	}
 
@@ -508,7 +513,7 @@ void DrawGrid(const Matrix4x4 &vpvMatrix) {
 };
 
 // 球表示
-void DrawSphere(const Sphere &sphere, const Matrix4x4& vpvMatrix, uint32_t color) {
+void DrawSphere(const Sphere &sphere, const Matrix4x4 &vpvMatrix, uint32_t color) {
 	const uint32_t kSubdivision = 16;									// 分割数
 	const float kLonEvery = 2.0f * static_cast<float>(M_PI) / static_cast<float>(kSubdivision);	// 経度分割1つ分の角度
 	const float kLatEvery = static_cast<float>(M_PI) / static_cast<float>(kSubdivision);			// 緯度分割1つ分の角度
@@ -717,12 +722,15 @@ void DrawAABB(const AABB &aabb, const Matrix4x4 &vpvMatrix, uint32_t color) {
 // OBBの軸
 void UpdateOBBOrientation(OBB &obb, const Vector3 &rotate) {
 	// 回転行列の作成
-	Matrix4x4 rotMat = Multiply(Multiply(MakeRotateXMatrix(rotate.x), MakeRotateYMatrix(rotate.y)), MakeRotateZMatrix(rotate.z));
+	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
+	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
+	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
+	Matrix4x4 rotateXYZMatrix = Multiply(rotateXMatrix, Multiply(rotateYMatrix, rotateZMatrix));
 
 	// 回転行列の各軸を取り出す
-	obb.orientations[0] = { rotMat.m[0][0], rotMat.m[0][1], rotMat.m[0][2] };
-	obb.orientations[1] = { rotMat.m[1][0], rotMat.m[1][1], rotMat.m[1][2] };
-	obb.orientations[2] = { rotMat.m[2][0], rotMat.m[2][1], rotMat.m[2][2] };
+	obb.orientations[0] = { rotateXYZMatrix.m[0][0], rotateXYZMatrix.m[0][1], rotateXYZMatrix.m[0][2] };
+	obb.orientations[1] = { rotateXYZMatrix.m[1][0], rotateXYZMatrix.m[1][1], rotateXYZMatrix.m[1][2] };
+	obb.orientations[2] = { rotateXYZMatrix.m[2][0], rotateXYZMatrix.m[2][1], rotateXYZMatrix.m[2][2] };
 }
 
 // OBB表示
@@ -853,7 +861,7 @@ bool IsCollision(const Line &line, const Plane &plane) {
 	float dot = Dot(plane.normal, line.diff);
 
 	// ゼロチェック
-	if (fabs(dot) < 1e-4f) {
+	if (fabs(dot) < kEpsilon) {
 		return false;
 	}
 
@@ -866,7 +874,7 @@ bool IsCollision(const Ray &ray, const Plane &plane) {
 	float dot = Dot(plane.normal, ray.diff);
 
 	// ゼロチェック
-	if (fabs(dot) < 1e-4f) {
+	if (fabs(dot) < kEpsilon) {
 		return false;
 	}
 
@@ -882,7 +890,7 @@ bool IsCollision(const Segment &segment, const Plane &plane) {
 	float dot = Dot(plane.normal, segment.diff);
 
 	// ゼロチェック
-	if (fabs(dot) < 1e-4f) {
+	if (fabs(dot) < kEpsilon) {
 		return false;
 	}
 
@@ -908,7 +916,7 @@ bool IsCollision(const Triangle &triangle, const Line &line) {
 	float denom = Dot(normal, line.diff);
 
 	// ゼロチェック
-	if (fabs(denom) < 1e-4f) {
+	if (fabs(denom) < kEpsilon) {
 		return false;
 	}
 
@@ -945,7 +953,7 @@ bool IsCollision(const Triangle &triangle, const Ray &ray) {
 	float denom = Dot(normal, ray.diff);
 
 	// ゼロチェック
-	if (fabs(denom) < 1e-4f) {
+	if (fabs(denom) < kEpsilon) {
 		return false;
 	}
 
@@ -987,7 +995,7 @@ bool IsCollision(const Triangle &triangle, const Segment &segment) {
 	float denom = Dot(normal, segment.diff);
 
 	// ゼロチェック
-	if (fabs(denom) < 1e-4f) {
+	if (fabs(denom) < kEpsilon) {
 		return false;
 	}
 
@@ -1128,36 +1136,39 @@ bool IsCollision(const AABB &aabb, const Segment &segment) {
 // OBBと球の当たり判定
 bool IsCollision(const OBB &obb, const Sphere &sphere) {
 	//	OBBのWorldMatrixを作る
-	Matrix4x4 worldMatrix = MakeIdentity4x4();
-	worldMatrix.m[0][0] = obb.orientations[0].x;
-	worldMatrix.m[0][1] = obb.orientations[0].y;
-	worldMatrix.m[0][2] = obb.orientations[0].z;
+	Matrix4x4 rotate = MakeIdentity4x4();
+	rotate.m[0][0] = obb.orientations[0].x;
+	rotate.m[0][1] = obb.orientations[0].y;
+	rotate.m[0][2] = obb.orientations[0].z;
 
-	worldMatrix.m[1][0] = obb.orientations[1].x;
-	worldMatrix.m[1][1] = obb.orientations[1].y;
-	worldMatrix.m[1][2] = obb.orientations[1].z;
+	rotate.m[1][0] = obb.orientations[1].x;
+	rotate.m[1][1] = obb.orientations[1].y;
+	rotate.m[1][2] = obb.orientations[1].z;
 
-	worldMatrix.m[2][0] = obb.orientations[2].x;
-	worldMatrix.m[2][1] = obb.orientations[2].y;
-	worldMatrix.m[2][2] = obb.orientations[2].z;
-
-	worldMatrix.m[3][0] = obb.center.x;
-	worldMatrix.m[3][1] = obb.center.y;
-	worldMatrix.m[3][2] = obb.center.z;
+	rotate.m[2][0] = obb.orientations[2].x;
+	rotate.m[2][1] = obb.orientations[2].y;
+	rotate.m[2][2] = obb.orientations[2].z;
 
 	// 逆行列
-	Matrix4x4 inverce = Inverse(worldMatrix);
+	Matrix4x4 transpose = Transpose(rotate);
+
+	// 平行移動打消し
+	Vector3 diff = Subtract(sphere.center, obb.center);
 
 	// 中心点をローカル空間上に持ち込む
-	Vector3 localCenter = Transform(sphere.center, inverce);
+	Vector3 localCenter = {
+		Dot(diff, obb.orientations[0]),
+		Dot(diff, obb.orientations[1]),
+		Dot(diff, obb.orientations[2]),
+	};
 
 	// ローカル空間上でのAABB(OBB)と球
-	AABB localAABB{ 
+	AABB localAABB{
 		.min = { -obb.size.x, -obb.size.y, -obb.size.z },
 		.max = {  obb.size.x,  obb.size.y,  obb.size.z },
 	};
-	Sphere localSphere{ 
-		.center = localCenter, 
+	Sphere localSphere{
+		.center = localCenter,
 		.radius = sphere.radius
 	};
 
@@ -1166,7 +1177,7 @@ bool IsCollision(const OBB &obb, const Sphere &sphere) {
 }
 
 // OBBと直線の当たり判定
-bool IsCollision(const OBB &obb, const Line &line) {
+bool IsCollision(const Line &line, const OBB &obb) {
 	//	OBBのWorldMatrixを作る
 	Matrix4x4 worldMatrix = MakeIdentity4x4();
 	worldMatrix.m[0][0] = obb.orientations[0].x;
@@ -1198,7 +1209,7 @@ bool IsCollision(const OBB &obb, const Line &line) {
 		.max = {  obb.size.x,  obb.size.y,  obb.size.z },
 	};
 	Line localLine{
-		.origin = localOrigin, 
+		.origin = localOrigin,
 		.diff = Subtract(localEnd, localOrigin),
 	};
 
@@ -1207,7 +1218,7 @@ bool IsCollision(const OBB &obb, const Line &line) {
 }
 
 // OBBと半線の当たり判定
-bool IsCollision(const OBB &obb, const Ray &ray) {
+bool IsCollision(const Ray &ray, const OBB &obb) {
 	//	OBBのWorldMatrixを作る
 	Matrix4x4 worldMatrix = MakeIdentity4x4();
 	worldMatrix.m[0][0] = obb.orientations[0].x;
@@ -1248,7 +1259,7 @@ bool IsCollision(const OBB &obb, const Ray &ray) {
 }
 
 // OBBと線分の当たり判定
-bool IsCollision(const OBB &obb, const Segment &segment) {
+bool IsCollision(const Segment &segment, const OBB &obb) {
 	//	OBBのWorldMatrixを作る
 	Matrix4x4 worldMatrix = MakeIdentity4x4();
 	worldMatrix.m[0][0] = obb.orientations[0].x;
@@ -1305,7 +1316,7 @@ bool OverlapOnAxis(const Vector3 &axis, const OBB &obb1, const OBB &obb2) {
 	// 投影区間
 	float min1 = Dot(obb1.center, axis) - projectionRadius1;
 	float max1 = Dot(obb1.center, axis) + projectionRadius1;
-	
+
 	float min2 = Dot(obb2.center, axis) - projectionRadius2;
 	float max2 = Dot(obb2.center, axis) + projectionRadius2;
 
@@ -1344,7 +1355,7 @@ bool IsCollision(const OBB &obb1, const OBB &obb2) {
 	// 各軸チェック
 	for (int i = 0; i < 15; ++i) {
 		// ゼロ軸チェック
-		if (LengthSquare(axes[i]) < 1e-4f) continue;
+		if (LengthSquare(axes[i]) < kEpsilon) continue;
 
 		// 正規化
 		Vector3 axis = Normalize(axes[i]);
@@ -1358,6 +1369,49 @@ bool IsCollision(const OBB &obb1, const OBB &obb2) {
 	// 衝突判定
 	return true;
 }
+#pragma endregion
+
+#pragma region ベジエ曲線
+
+// 線形補間
+Vector3 Lerp(const Vector3 &v1, const Vector3 &v2, float t) {
+	return {
+		v1.x + (v2.x - v1.x) * t,
+		v1.y + (v2.y - v1.y) * t,
+		v1.z + (v2.z - v1.z) * t,
+
+	};
+}
+
+// ベジエ曲線表示
+void DrawBezier(const Vector3 &controlPoint0, const Vector3 &controlPoint1, const Vector3 &controlPoint2, const Matrix4x4 &vpvMatrix, uint32_t color) {
+	const int kSubdivision = 32;
+	Vector3 prevPoint = controlPoint0;
+
+	for (int i = 1; i <= kSubdivision; i++) {
+		float t = float(i) / float(kSubdivision);
+
+		// 線形補間
+		Vector3 a = Lerp(controlPoint0, controlPoint1, t);
+		Vector3 b = Lerp(controlPoint1, controlPoint2, t);
+
+		// ベジエ曲線上の点を求める
+		Vector3 point = Lerp(a, b, t);
+
+		// スクリーン座標への変換
+		Vector3 screenPrev = Transform(prevPoint, vpvMatrix);
+		Vector3 screenNow = Transform(point, vpvMatrix);
+
+		// 描画
+		Novice::DrawLine(
+			static_cast<int>(screenPrev.x), static_cast<int>(screenPrev.y),
+			static_cast<int>(screenNow.x),  static_cast<int>(screenNow.y), color
+		);
+
+		prevPoint = point;
+	}
+}
+
 #pragma endregion
 
 static const float kWindowWidth = 1280.0f;
@@ -1375,29 +1429,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	// OBB
-	Vector3 rotate1{ 0.0f,0.0f,0.0f };
-	OBB obb1{
-		.center{ 0.0f,0.0f,0.0f },
-		.orientations = {
-			{ 1.0f,0.0f,0.0f },
-			{ 0.0f,1.0f,0.0f },
-			{ 0.0f,0.0f,1.0f },
-		},
-		.size{ 0.83f,0.26f,0.24f },
+	// ベジエ
+	Vector3 controlPoints[3]{
+		{-0.8f, 0.58f, 1.0f},
+		{1.76f, 1.0f, -0.3f},
+		{0.94f, -0.7f, 2.3f},
 	};
-
-	Vector3 rotate2{ -0.05f,-2.49f,0.15f };
-	OBB obb2{
-		.center{ 0.9f,0.66f,0.24f },
-		.orientations = {
-			{ 1.0f,0.0f,0.0f },
-			{ 0.0f,1.0f,0.0f },
-			{ 0.0f,0.0f,1.0f },
-		},
-		.size{ 0.5f,0.37f,0.5f },
-	};
-
+	
 	// カメラ
 	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
 	Vector3 cameraRotate{ 0.26f, 0.0f, 0.0f };
@@ -1420,20 +1458,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region ImGui
 		ImGui::Begin("Window");
 
-		// OBB
-		ImGui::DragFloat3("obb1.center", &obb1.center.x, 0.01f);
-		ImGui::SliderFloat("obb1.rotateX", &rotate1.x, -500.0f, 500.0f, "%.0f deg");
-		ImGui::SliderFloat("obb1.rotateY", &rotate1.y, -500.0f, 500.0f, "%.0f deg");
-		ImGui::SliderFloat("obb1.rotateZ", &rotate1.z, -500.0f, 500.0f, "%.0f deg");
-		UpdateOBBOrientation(obb1, rotate1);
-		ImGui::DragFloat3("obb1.size", &obb1.size.x, 0.01f);
-
-		ImGui::DragFloat3("obb2.center", &obb2.center.x, 0.01f);
-		ImGui::SliderFloat("obb2.rotateX", &rotate2.x, -500.0f, 500.0f, "%.0f deg");
-		ImGui::SliderFloat("obb2.rotateY", &rotate2.y, -500.0f, 500.0f, "%.0f deg");
-		ImGui::SliderFloat("obb2.rotateZ", &rotate2.z, -500.0f, 500.0f, "%.0f deg");
-		UpdateOBBOrientation(obb2, rotate2);
-		ImGui::DragFloat3("obb2.size", &obb2.size.x, 0.01f);
+		// ベジエ
+		ImGui::SliderFloat3("controlPoints[0]", &controlPoints[0].x, -5.0f, 5.0f);
+		ImGui::SliderFloat3("controlPoints[1]", &controlPoints[1].x, -5.0f, 5.0f);
+		ImGui::SliderFloat3("controlPoints[2]", &controlPoints[2].x, -5.0f, 5.0f);
 
 		ImGui::End();
 #pragma endregion
@@ -1468,14 +1496,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// グリッド
 		DrawGrid(vpvMatrix);
 
-		// OBB
-		if (IsCollision(obb1, obb2)) {
-			DrawOBB(obb1, vpvMatrix, 0xFF0000FF);
-		} else {
-			DrawOBB(obb1, vpvMatrix, 0xFFFFFFFF);
-		}
+		// 点
+		Sphere pointSphere[3]{
+			{controlPoints[0], 0.01f},
+			{controlPoints[1], 0.01f},
+			{controlPoints[2], 0.01f},
+		};
+		DrawSphere(pointSphere[0], vpvMatrix, 0x000000FF);
+		DrawSphere(pointSphere[1], vpvMatrix, 0x000000FF);
+		DrawSphere(pointSphere[2], vpvMatrix, 0x000000FF);
 
-		DrawOBB(obb2, vpvMatrix, 0xFFFFFFFF);
+		// ベジエ
+		DrawBezier(controlPoints[0], controlPoints[1], controlPoints[2], vpvMatrix, 0x0000FFFF);
 
 		///
 		/// ↑描画処理ここまで
