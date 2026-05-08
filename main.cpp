@@ -69,6 +69,22 @@ struct OBB {
 	Vector3 size;
 };
 
+struct Spring {
+	Vector3 anchor;
+	float naturalLength;
+	float stiffness;
+	float dampingCoefficient;
+};
+
+struct Ball {
+	Vector3 position;
+	Vector3 velocity;
+	Vector3 acceleration;
+	float mass;
+	float radius;
+	unsigned int color;
+};
+
 // 定数
 //=========================
 
@@ -1438,6 +1454,31 @@ Vector3 operator+(const Vector3 &v) { return v; }
 
 #pragma endregion
 
+#pragma region 物理
+
+// バネの動き
+void UpdateSpringBall(const Spring &spring, Ball &ball, float deltaTime) {
+	// 加速度初期化
+	ball.acceleration = {};
+
+	Vector3 diff = ball.position - spring.anchor;
+	float length = Length(diff);
+	if (fabs(length) > kEpsilon) {
+		Vector3 direction = Normalize(diff);
+		Vector3 restPosition = spring.anchor + direction * spring.naturalLength;
+		Vector3 displacement = length * (ball.position - restPosition);
+		Vector3 restoringForce = -spring.stiffness * displacement;
+		Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
+		Vector3 force = restoringForce + dampingForce;
+		ball.acceleration = force / ball.mass;
+	}
+
+	ball.velocity += ball.acceleration * deltaTime;
+	ball.position += ball.velocity * deltaTime;
+}
+
+#pragma endregion
+
 static const float kWindowWidth = 1280.0f;
 static const float kWindowHeight = 720.0f;
 
@@ -1453,16 +1494,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	Vector3 a{0.2f, 1.0f, 0.0f};
-	Vector3 b{2.4f, 3.1f, 1.2f};
-	Vector3 c = a + b;
-	Vector3 d = a - b;
-	Vector3 e = a * 2.4f;
-	Vector3 rotate{0.4f, 1.43f, -0.8f};
-	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
-	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
-	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
-	Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
+	// バネ
+	Spring spring{
+		.anchor{0.0f, 0.0f,0.0f},
+		.naturalLength{1.0f},
+		.stiffness{100.0f},
+		.dampingCoefficient{2.0f},
+	};
+
+	// 球体
+	Ball ball{
+		.position{1.2f, 0.0f, 0.0f},
+		.mass{2.0f},
+		.radius{0.05f},
+		.color{0x0000FFFF},
+	};
 
 	// カメラ
 	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
@@ -1486,19 +1532,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region ImGui
 		ImGui::Begin("Window");
 
-		ImGui::Text("c:%f, %f, %f", c.x, c.y, c.z);
-		ImGui::Text("d:%f, %f, %f", d.x, d.y, d.z);
-		ImGui::Text("e:%f, %f, %f", e.x, e.y, e.z);
-		ImGui::Text(
-			"matrix:\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f",
-			rotateMatrix.m[0][0], rotateMatrix.m[0][1], rotateMatrix.m[0][2], rotateMatrix.m[0][3],
-			rotateMatrix.m[1][0], rotateMatrix.m[1][1], rotateMatrix.m[1][2], rotateMatrix.m[1][3],
-			rotateMatrix.m[2][0], rotateMatrix.m[2][1], rotateMatrix.m[2][2], rotateMatrix.m[2][3],
-			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]
-		);
+		if (ImGui::Button("Start")) {
+			ball.position.x = 1.2f;
+		}
 
 		ImGui::End();
 #pragma endregion
+
+		/* バネ移動
+		---------------*/
+		float deltaTime = 1.0f / 60.0f;
+
+		UpdateSpringBall(spring, ball, deltaTime);
 
 		/* カメラ処理
 		---------------*/
@@ -1529,6 +1574,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// グリッド
 		DrawGrid(vpvMatrix);
+
+		// バネ
+		Vector3 springScreenPoint[2];
+		springScreenPoint[0] = Transform(spring.anchor, vpvMatrix);
+		springScreenPoint[1] = Transform(ball.position, vpvMatrix);
+		Novice::DrawLine(
+			static_cast<int>(springScreenPoint[0].x), static_cast<int>(springScreenPoint[0].y),
+			static_cast<int>(springScreenPoint[1].x), static_cast<int>(springScreenPoint[1].y),
+			0xFFFFFFFF
+		);
+
+		// 球体
+		Sphere ballModel{
+			.center{ball.position},
+			.radius{0.05f},
+		};
+		DrawSphere(ballModel, vpvMatrix, ball.color);
 
 		///
 		/// ↑描画処理ここまで
