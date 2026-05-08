@@ -17,6 +17,12 @@ struct Vector3 {
 	float x;
 	float y;
 	float z;
+
+	// 複合代入演算子(演算子オーバーロード)
+	Vector3 &operator*=(float s) { x *= s; y *= s; z *= s; return *this; }
+	Vector3 &operator-=(const Vector3 &v) { x -= v.x; y -= v.y; z -= v.z; return *this; }
+	Vector3 &operator+=(const Vector3 &v) { x += v.x; y += v.y; z += v.z; return *this; }
+	Vector3 &operator/=(float s) { x /= s; y /= s; z /= s; return *this; }
 };
 
 struct Matrix4x4 {
@@ -1414,13 +1420,23 @@ void DrawBezier(const Vector3 &controlPoint0, const Vector3 &controlPoint1, cons
 
 #pragma endregion
 
-Vector3 GetWorldPosition(const Matrix4x4 &matrix) {
-	return {
-		matrix.m[3][0],
-		matrix.m[3][1],
-		matrix.m[3][2]
-	};
-}
+#pragma region 演算子オーバーロード
+
+// 二項演算子
+Vector3 operator+ (const Vector3 &v1, const Vector3 &v2) { return Add(v1, v2); }
+Vector3 operator- (const Vector3 &v1, const Vector3 &v2) { return Subtract(v1, v2); }
+Vector3 operator* (float s, const Vector3 &v) { return Multiply(s, v); }
+Vector3 operator* (const Vector3 &v, float s) { return s * v; }
+Vector3 operator/ (const Vector3 &v, float s) { return Multiply(1.0f / s, v); }
+Matrix4x4 operator+(const Matrix4x4 &m1, const Matrix4x4 &m2) { return Add(m1, m2); }
+Matrix4x4 operator-(const Matrix4x4 &m1, const Matrix4x4 &m2) { return Subtract(m1, m2); }
+Matrix4x4 operator*(const Matrix4x4 &m1, const Matrix4x4 &m2) { return Multiply(m1, m2); }
+
+// 単項演算子
+Vector3 operator-(const Vector3 &v) { return { -v.x, -v.y, -v.z }; }
+Vector3 operator+(const Vector3 &v) { return v; }
+
+#pragma endregion
 
 static const float kWindowWidth = 1280.0f;
 static const float kWindowHeight = 720.0f;
@@ -1437,25 +1453,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	// 階層構造
-	Vector3 translates[3]{
-		{0.2f, 1.0f, 0.0f},
-		{0.4f, 0.0f, 0.0f},
-		{0.3f, 0.0f, 0.0f},
-	};
+	Vector3 a{0.2f, 1.0f, 0.0f};
+	Vector3 b{2.4f, 3.1f, 1.2f};
+	Vector3 c = a + b;
+	Vector3 d = a - b;
+	Vector3 e = a * 2.4f;
+	Vector3 rotate{0.4f, 1.43f, -0.8f};
+	Matrix4x4 rotateXMatrix = MakeRotateXMatrix(rotate.x);
+	Matrix4x4 rotateYMatrix = MakeRotateYMatrix(rotate.y);
+	Matrix4x4 rotateZMatrix = MakeRotateZMatrix(rotate.z);
+	Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
 
-	Vector3 rotates[3]{
-		{0.0f, 0.0f,-6.8f},
-		{0.0f, 0.0f,-1.4f},
-		{0.0f, 0.0f, 0.0f},
-	};
-
-	Vector3 scales[3]{
-		{1.0f, 1.0f, 1.0f},
-		{1.0f, 1.0f, 1.0f},
-		{1.0f, 1.0f, 1.0f},
-	};
-	
 	// カメラ
 	Vector3 cameraTranslation{ 0.0f, 1.9f, -6.49f };
 	Vector3 cameraRotate{ 0.26f, 0.0f, 0.0f };
@@ -1478,35 +1486,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region ImGui
 		ImGui::Begin("Window");
 
-		// 階層構造
-		ImGui::SliderFloat3("translates[0]", &translates[0].x, -10.0f, 10.0f);
-		ImGui::SliderFloat3("rotates[0]", &rotates[0].x, -10.0f, 10.0f);
-		ImGui::SliderFloat3("scales[0]", &scales[0].x, -10.0f, 10.0f);
-
-		ImGui::SliderFloat3("translates[1]", &translates[1].x, -10.0f, 10.0f);
-		ImGui::SliderFloat3("rotates[1]", &rotates[1].x, -10.0f, 10.0f);
-		ImGui::SliderFloat3("scales[1]", &scales[1].x, -10.0f, 10.0f);
-		
-		ImGui::SliderFloat3("translates[2]", &translates[2].x, -10.0f, 10.0f);
-		ImGui::SliderFloat3("rotates[2]", &rotates[2].x, -10.0f, 10.0f);
-		ImGui::SliderFloat3("scales[2]", &scales[2].x, -10.0f, 10.0f);
+		ImGui::Text("c:%f, %f, %f", c.x, c.y, c.z);
+		ImGui::Text("d:%f, %f, %f", d.x, d.y, d.z);
+		ImGui::Text("e:%f, %f, %f", e.x, e.y, e.z);
+		ImGui::Text(
+			"matrix:\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f",
+			rotateMatrix.m[0][0], rotateMatrix.m[0][1], rotateMatrix.m[0][2], rotateMatrix.m[0][3],
+			rotateMatrix.m[1][0], rotateMatrix.m[1][1], rotateMatrix.m[1][2], rotateMatrix.m[1][3],
+			rotateMatrix.m[2][0], rotateMatrix.m[2][1], rotateMatrix.m[2][2], rotateMatrix.m[2][3],
+			rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]
+		);
 
 		ImGui::End();
 #pragma endregion
-
-		/* 階層構造
-		---------------*/
-		// LocalMatrixの作成
-		Matrix4x4 localMatrix[3]{};
-		for (int i = 0; i < 3; i++) {
-			localMatrix[i] = MakeAffineMatrix(scales[i], rotates[i], translates[i]);
-		}
-
-		// WorldMatrixの作成
-		Matrix4x4 worldMatrix[3]{};
-		worldMatrix[0] = localMatrix[0];							// 親
-		worldMatrix[1] = Multiply(localMatrix[1], worldMatrix[0]);	// 子
-		worldMatrix[2] = Multiply(localMatrix[2], worldMatrix[1]);	// 孫
 
 		/* カメラ処理
 		---------------*/
@@ -1537,30 +1529,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// グリッド
 		DrawGrid(vpvMatrix);
-
-		// 階層構造
-		Sphere joints[3]{};
-		Vector3 jointPoints[3]{};
-		for (int i = 0; i < 3; i++) {
-			joints[i].center = {GetWorldPosition(worldMatrix[i])};
-			joints[i].radius = {0.05f};
-
-			jointPoints[i] = Transform(joints[i].center, vpvMatrix);
-		}
-
-		DrawSphere(joints[0], vpvMatrix, 0xFF0000FF);	// 親
-		DrawSphere(joints[1], vpvMatrix, 0x00FF00FF);	// 子
-		DrawSphere(joints[2], vpvMatrix, 0x0000FFFF);	// 孫
-
-		Novice::DrawLine(	// 親to子
-			static_cast<int>(jointPoints[0].x), static_cast<int>(jointPoints[0].y),
-			static_cast<int>(jointPoints[1].x), static_cast<int>(jointPoints[1].y), 0xFFFFFFFF
-		);
-
-		Novice::DrawLine(	// 子to孫
-			static_cast<int>(jointPoints[1].x), static_cast<int>(jointPoints[1].y),
-			static_cast<int>(jointPoints[2].x), static_cast<int>(jointPoints[2].y), 0xFFFFFFFF
-		);
 
 		///
 		/// ↑描画処理ここまで
