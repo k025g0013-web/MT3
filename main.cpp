@@ -1414,6 +1414,14 @@ void DrawBezier(const Vector3 &controlPoint0, const Vector3 &controlPoint1, cons
 
 #pragma endregion
 
+Vector3 GetWorldPosition(const Matrix4x4 &matrix) {
+	return {
+		matrix.m[3][0],
+		matrix.m[3][1],
+		matrix.m[3][2]
+	};
+}
+
 static const float kWindowWidth = 1280.0f;
 static const float kWindowHeight = 720.0f;
 
@@ -1429,11 +1437,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	// ベジエ
-	Vector3 controlPoints[3]{
-		{-0.8f, 0.58f, 1.0f},
-		{1.76f, 1.0f, -0.3f},
-		{0.94f, -0.7f, 2.3f},
+	// 階層構造
+	Vector3 translates[3]{
+		{0.2f, 1.0f, 0.0f},
+		{0.4f, 0.0f, 0.0f},
+		{0.3f, 0.0f, 0.0f},
+	};
+
+	Vector3 rotates[3]{
+		{0.0f, 0.0f,-6.8f},
+		{0.0f, 0.0f,-1.4f},
+		{0.0f, 0.0f, 0.0f},
+	};
+
+	Vector3 scales[3]{
+		{1.0f, 1.0f, 1.0f},
+		{1.0f, 1.0f, 1.0f},
+		{1.0f, 1.0f, 1.0f},
 	};
 	
 	// カメラ
@@ -1458,13 +1478,35 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region ImGui
 		ImGui::Begin("Window");
 
-		// ベジエ
-		ImGui::SliderFloat3("controlPoints[0]", &controlPoints[0].x, -5.0f, 5.0f);
-		ImGui::SliderFloat3("controlPoints[1]", &controlPoints[1].x, -5.0f, 5.0f);
-		ImGui::SliderFloat3("controlPoints[2]", &controlPoints[2].x, -5.0f, 5.0f);
+		// 階層構造
+		ImGui::SliderFloat3("translates[0]", &translates[0].x, -10.0f, 10.0f);
+		ImGui::SliderFloat3("rotates[0]", &rotates[0].x, -10.0f, 10.0f);
+		ImGui::SliderFloat3("scales[0]", &scales[0].x, -10.0f, 10.0f);
+
+		ImGui::SliderFloat3("translates[1]", &translates[1].x, -10.0f, 10.0f);
+		ImGui::SliderFloat3("rotates[1]", &rotates[1].x, -10.0f, 10.0f);
+		ImGui::SliderFloat3("scales[1]", &scales[1].x, -10.0f, 10.0f);
+		
+		ImGui::SliderFloat3("translates[2]", &translates[2].x, -10.0f, 10.0f);
+		ImGui::SliderFloat3("rotates[2]", &rotates[2].x, -10.0f, 10.0f);
+		ImGui::SliderFloat3("scales[2]", &scales[2].x, -10.0f, 10.0f);
 
 		ImGui::End();
 #pragma endregion
+
+		/* 階層構造
+		---------------*/
+		// LocalMatrixの作成
+		Matrix4x4 localMatrix[3]{};
+		for (int i = 0; i < 3; i++) {
+			localMatrix[i] = MakeAffineMatrix(scales[i], rotates[i], translates[i]);
+		}
+
+		// WorldMatrixの作成
+		Matrix4x4 worldMatrix[3]{};
+		worldMatrix[0] = localMatrix[0];							// 親
+		worldMatrix[1] = Multiply(localMatrix[1], worldMatrix[0]);	// 子
+		worldMatrix[2] = Multiply(localMatrix[2], worldMatrix[1]);	// 孫
 
 		/* カメラ処理
 		---------------*/
@@ -1496,18 +1538,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// グリッド
 		DrawGrid(vpvMatrix);
 
-		// 点
-		Sphere pointSphere[3]{
-			{controlPoints[0], 0.01f},
-			{controlPoints[1], 0.01f},
-			{controlPoints[2], 0.01f},
-		};
-		DrawSphere(pointSphere[0], vpvMatrix, 0x000000FF);
-		DrawSphere(pointSphere[1], vpvMatrix, 0x000000FF);
-		DrawSphere(pointSphere[2], vpvMatrix, 0x000000FF);
+		// 階層構造
+		Sphere joints[3]{};
+		Vector3 jointPoints[3]{};
+		for (int i = 0; i < 3; i++) {
+			joints[i].center = {GetWorldPosition(worldMatrix[i])};
+			joints[i].radius = {0.05f};
 
-		// ベジエ
-		DrawBezier(controlPoints[0], controlPoints[1], controlPoints[2], vpvMatrix, 0x0000FFFF);
+			jointPoints[i] = Transform(joints[i].center, vpvMatrix);
+		}
+
+		DrawSphere(joints[0], vpvMatrix, 0xFF0000FF);	// 親
+		DrawSphere(joints[1], vpvMatrix, 0x00FF00FF);	// 子
+		DrawSphere(joints[2], vpvMatrix, 0x0000FFFF);	// 孫
+
+		Novice::DrawLine(	// 親to子
+			static_cast<int>(jointPoints[0].x), static_cast<int>(jointPoints[0].y),
+			static_cast<int>(jointPoints[1].x), static_cast<int>(jointPoints[1].y), 0xFFFFFFFF
+		);
+
+		Novice::DrawLine(	// 子to孫
+			static_cast<int>(jointPoints[1].x), static_cast<int>(jointPoints[1].y),
+			static_cast<int>(jointPoints[2].x), static_cast<int>(jointPoints[2].y), 0xFFFFFFFF
+		);
 
 		///
 		/// ↑描画処理ここまで
