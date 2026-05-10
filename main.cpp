@@ -18,10 +18,10 @@ struct Vector3 {
 	float y;
 	float z;
 
-	// 複合代入演算子(演算子オーバーロード)
-	Vector3 &operator*=(float s) { x *= s; y *= s; z *= s; return *this; }
-	Vector3 &operator-=(const Vector3 &v) { x -= v.x; y -= v.y; z -= v.z; return *this; }
+	// 複合代入演算子
 	Vector3 &operator+=(const Vector3 &v) { x += v.x; y += v.y; z += v.z; return *this; }
+	Vector3 &operator-=(const Vector3 &v) { x -= v.x; y -= v.y; z -= v.z; return *this; }
+	Vector3 &operator*=(float s) { x *= s; y *= s; z *= s; return *this; }
 	Vector3 &operator/=(float s) { x /= s; y /= s; z /= s; return *this; }
 };
 
@@ -172,6 +172,11 @@ float LengthSquare(const Vector3 &v) {
 // 正規化
 Vector3 Normalize(const Vector3 &v) {
 	float length = Length(v);
+
+	if (length < kEpsilon) {
+		return {};
+	}
+
 	Vector3 result = {
 		v.x / length,
 		v.y / length,
@@ -1449,8 +1454,8 @@ Matrix4x4 operator-(const Matrix4x4 &m1, const Matrix4x4 &m2) { return Subtract(
 Matrix4x4 operator*(const Matrix4x4 &m1, const Matrix4x4 &m2) { return Multiply(m1, m2); }
 
 // 単項演算子
-Vector3 operator-(const Vector3 &v) { return { -v.x, -v.y, -v.z }; }
 Vector3 operator+(const Vector3 &v) { return v; }
+Vector3 operator-(const Vector3 &v) { return { -v.x, -v.y, -v.z }; }
 
 #pragma endregion
 
@@ -1463,13 +1468,15 @@ void UpdateSpringBall(const Spring &spring, Ball &ball, float deltaTime) {
 
 	Vector3 diff = ball.position - spring.anchor;
 	float length = Length(diff);
+
 	if (fabs(length) > kEpsilon) {
 		Vector3 direction = Normalize(diff);
 		Vector3 restPosition = spring.anchor + direction * spring.naturalLength;
-		Vector3 displacement = length * (ball.position - restPosition);
+		Vector3 displacement = ball.position - restPosition;
 		Vector3 restoringForce = -spring.stiffness * displacement;
 		Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
 		Vector3 force = restoringForce + dampingForce;
+		
 		ball.acceleration = force / ball.mass;
 	}
 
@@ -1532,8 +1539,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region ImGui
 		ImGui::Begin("Window");
 
+		// バネ始動
 		if (ImGui::Button("Start")) {
 			ball.position.x = 1.2f;
+			ball.velocity = {};
+			ball.acceleration = {};
 		}
 
 		ImGui::End();
