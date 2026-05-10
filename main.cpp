@@ -1432,7 +1432,7 @@ void DrawBezier(const Vector3 &controlPoint0, const Vector3 &controlPoint1, cons
 		// 描画
 		Novice::DrawLine(
 			static_cast<int>(screenPrev.x), static_cast<int>(screenPrev.y),
-			static_cast<int>(screenNow.x),  static_cast<int>(screenNow.y), color
+			static_cast<int>(screenNow.x), static_cast<int>(screenNow.y), color
 		);
 
 		prevPoint = point;
@@ -1476,12 +1476,21 @@ void UpdateSpringBall(const Spring &spring, Ball &ball, float deltaTime) {
 		Vector3 restoringForce = -spring.stiffness * displacement;
 		Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
 		Vector3 force = restoringForce + dampingForce;
-		
+
 		ball.acceleration = force / ball.mass;
 	}
 
 	ball.velocity += ball.acceleration * deltaTime;
 	ball.position += ball.velocity * deltaTime;
+}
+
+// 等速円運動
+Vector3 CircularMotion( const Vector3 &center, float radius, float angle) {
+	return {
+		center.x + std::cos(angle) * radius,
+		center.y + std::sin(angle) * radius,
+		center.z
+	};
 }
 
 #pragma endregion
@@ -1501,20 +1510,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	// バネ
-	Spring spring{
-		.anchor{0.0f, 0.0f,0.0f},
-		.naturalLength{1.0f},
-		.stiffness{100.0f},
-		.dampingCoefficient{2.0f},
-	};
+	Vector3 center = { 0.0f, 0.0f, 0.0f };
+	float radius = 0.8f;
+	float angularVelocity = static_cast<float>(M_PI) ;
+	float angle = 0.0f;
 
-	// 球体
-	Ball ball{
-		.position{1.2f, 0.0f, 0.0f},
-		.mass{2.0f},
-		.radius{0.05f},
-		.color{0x0000FFFF},
+	bool isMove = false;
+
+	// 球
+	Sphere sphere{
+		.center = {0.8f, 0.0f, 0.0f},
+		.radius = 0.05f
 	};
 
 	// カメラ
@@ -1539,11 +1545,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region ImGui
 		ImGui::Begin("Window");
 
-		// バネ始動
+		// 円運動開始
 		if (ImGui::Button("Start")) {
-			ball.position.x = 1.2f;
-			ball.velocity = {};
-			ball.acceleration = {};
+			isMove = true;
 		}
 
 		ImGui::End();
@@ -1553,7 +1557,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		---------------*/
 		float deltaTime = 1.0f / 60.0f;
 
-		UpdateSpringBall(spring, ball, deltaTime);
+		if (isMove) {
+			angle += angularVelocity * deltaTime;
+
+			sphere.center = CircularMotion(center, radius, angle);
+		}
 
 		/* カメラ処理
 		---------------*/
@@ -1585,22 +1593,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// グリッド
 		DrawGrid(vpvMatrix);
 
-		// バネ
-		Vector3 springScreenPoint[2];
-		springScreenPoint[0] = Transform(spring.anchor, vpvMatrix);
-		springScreenPoint[1] = Transform(ball.position, vpvMatrix);
-		Novice::DrawLine(
-			static_cast<int>(springScreenPoint[0].x), static_cast<int>(springScreenPoint[0].y),
-			static_cast<int>(springScreenPoint[1].x), static_cast<int>(springScreenPoint[1].y),
-			0xFFFFFFFF
-		);
-
-		// 球体
-		Sphere ballModel{
-			.center{ball.position},
-			.radius{0.05f},
-		};
-		DrawSphere(ballModel, vpvMatrix, ball.color);
+		// 球
+		DrawSphere(sphere, vpvMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
