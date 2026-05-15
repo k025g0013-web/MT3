@@ -85,6 +85,14 @@ struct Ball {
 	unsigned int color;
 };
 
+struct Pendulum {
+	Vector3 anchor;
+	float length;
+	float angle;
+	float anglarVelocity;
+	float anglarAcceleration;
+};
+
 // 定数
 //=========================
 
@@ -1459,42 +1467,6 @@ Vector3 operator-(const Vector3 &v) { return { -v.x, -v.y, -v.z }; }
 
 #pragma endregion
 
-#pragma region 物理
-
-// バネの動き
-void UpdateSpringBall(const Spring &spring, Ball &ball, float deltaTime) {
-	// 加速度初期化
-	ball.acceleration = {};
-
-	Vector3 diff = ball.position - spring.anchor;
-	float length = Length(diff);
-
-	if (fabs(length) > kEpsilon) {
-		Vector3 direction = Normalize(diff);
-		Vector3 restPosition = spring.anchor + direction * spring.naturalLength;
-		Vector3 displacement = ball.position - restPosition;
-		Vector3 restoringForce = -spring.stiffness * displacement;
-		Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
-		Vector3 force = restoringForce + dampingForce;
-
-		ball.acceleration = force / ball.mass;
-	}
-
-	ball.velocity += ball.acceleration * deltaTime;
-	ball.position += ball.velocity * deltaTime;
-}
-
-// 等速円運動
-Vector3 CircularMotion( const Vector3 &center, float radius, float angle) {
-	return {
-		center.x + std::cos(angle) * radius,
-		center.y + std::sin(angle) * radius,
-		center.z
-	};
-}
-
-#pragma endregion
-
 static const float kWindowWidth = 1280.0f;
 static const float kWindowHeight = 720.0f;
 
@@ -1510,17 +1482,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	/* 変数の初期化
 	---------------*/
-	Vector3 center = { 0.0f, 0.0f, 0.0f };
-	float radius = 0.8f;
-	float angularVelocity = static_cast<float>(M_PI) ;
-	float angle = 0.0f;
-
 	bool isMove = false;
 
-	// 球
-	Sphere sphere{
-		.center = {0.8f, 0.0f, 0.0f},
-		.radius = 0.05f
+	// 振り子
+	Pendulum pendulum{
+		.anchor{0.0f, 1.0f, 0.0f},
+		.length{0.8f},
+		.angle{0.7f},
+		.anglarVelocity{0.0f},
+		.anglarAcceleration{0.0f},
+	};
+
+	// おもり
+	Sphere bob{
+		.center{0.0f, 0.0f, 0.0f},
+		.radius{0.05f},
 	};
 
 	// カメラ
@@ -1553,15 +1529,23 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ImGui::End();
 #pragma endregion
 
-		/* バネ移動
+		/* 物理運動
 		---------------*/
 		float deltaTime = 1.0f / 60.0f;
 
 		if (isMove) {
-			angle += angularVelocity * deltaTime;
-
-			sphere.center = CircularMotion(center, radius, angle);
+			pendulum.anglarAcceleration = 
+				-(9.8f / pendulum.length) * std::sin(pendulum.angle);
+			pendulum.anglarVelocity += pendulum.anglarAcceleration * deltaTime;
+			pendulum.angle += pendulum.anglarVelocity * deltaTime;
 		}
+
+		// おもり
+		bob.center = {
+			pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length,
+			pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length,
+			pendulum.anchor.z,
+		};
 
 		/* カメラ処理
 		---------------*/
@@ -1593,8 +1577,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// グリッド
 		DrawGrid(vpvMatrix);
 
-		// 球
-		DrawSphere(sphere, vpvMatrix, 0xFFFFFFFF);
+		// 振り子
+		Vector3 pendulumScreenPoint[2];
+		pendulumScreenPoint[0] = Transform(pendulum.anchor, vpvMatrix);
+		pendulumScreenPoint[1] = Transform(bob.center, vpvMatrix);
+		Novice::DrawLine(
+			static_cast<int>(pendulumScreenPoint[0].x), static_cast<int>(pendulumScreenPoint[0].y),
+			static_cast<int>(pendulumScreenPoint[1].x), static_cast<int>(pendulumScreenPoint[1].y),
+			0xFFFFFFFF
+		);
+
+		// おもり
+		DrawSphere(bob, vpvMatrix, 0xFFFFFFFF);
 
 		///
 		/// ↑描画処理ここまで
