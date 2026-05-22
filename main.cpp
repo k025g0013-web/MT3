@@ -93,6 +93,14 @@ struct Pendulum {
 	float anglarAcceleration;
 };
 
+struct ConicalPendulum {
+	Vector3 anchor;
+	float length;
+	float halfApexAngle;
+	float angle;
+	float anglarVelocity;
+};
+
 // 定数
 //=========================
 
@@ -1485,12 +1493,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	bool isMove = false;
 
 	// 振り子
-	Pendulum pendulum{
+	ConicalPendulum conicalPendulum{
 		.anchor{0.0f, 1.0f, 0.0f},
 		.length{0.8f},
-		.angle{0.7f},
+		.halfApexAngle{0.7f},
+		.angle{0.0f},
 		.anglarVelocity{0.0f},
-		.anglarAcceleration{0.0f},
 	};
 
 	// おもり
@@ -1526,6 +1534,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			isMove = true;
 		}
 
+		// 数値調整
+		ImGui::SliderFloat("Length", &conicalPendulum.length, 0.0f, 1.0f);
+		ImGui::SliderFloat("HalfApexAngle", &conicalPendulum.halfApexAngle, 0.0f, 1.0f);
+
 		ImGui::End();
 #pragma endregion
 
@@ -1533,18 +1545,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		---------------*/
 		float deltaTime = 1.0f / 60.0f;
 
+		// 振り子
 		if (isMove) {
-			pendulum.anglarAcceleration = 
-				-(9.8f / pendulum.length) * std::sin(pendulum.angle);
-			pendulum.anglarVelocity += pendulum.anglarAcceleration * deltaTime;
-			pendulum.angle += pendulum.anglarVelocity * deltaTime;
+			conicalPendulum.anglarVelocity = 
+				std::sqrt(9.8f / (conicalPendulum.length * std::cos(conicalPendulum.halfApexAngle)));
+			conicalPendulum.angle += conicalPendulum.anglarVelocity * deltaTime;
 		}
+
+		// 円運動の半径
+		float radius = conicalPendulum.length * std::sin(conicalPendulum.halfApexAngle);
 
 		// おもり
 		bob.center = {
-			pendulum.anchor.x + std::sin(pendulum.angle) * pendulum.length,
-			pendulum.anchor.y - std::cos(pendulum.angle) * pendulum.length,
-			pendulum.anchor.z,
+			conicalPendulum.anchor.x + std::cos(conicalPendulum.angle) * radius,
+			conicalPendulum.anchor.y - conicalPendulum.length,
+			conicalPendulum.anchor.z - std::sin(conicalPendulum.angle) * radius,
 		};
 
 		/* カメラ処理
@@ -1579,7 +1594,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 振り子
 		Vector3 pendulumScreenPoint[2];
-		pendulumScreenPoint[0] = Transform(pendulum.anchor, vpvMatrix);
+		pendulumScreenPoint[0] = Transform(conicalPendulum.anchor, vpvMatrix);
 		pendulumScreenPoint[1] = Transform(bob.center, vpvMatrix);
 		Novice::DrawLine(
 			static_cast<int>(pendulumScreenPoint[0].x), static_cast<int>(pendulumScreenPoint[0].y),
