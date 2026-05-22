@@ -98,7 +98,12 @@ struct ConicalPendulum {
 	float length;
 	float halfApexAngle;
 	float angle;
-	float anglarVelocity;
+	float angularVelocity;
+};
+
+struct Capsule {
+	Segment segment;
+	float radius;
 };
 
 // 定数
@@ -669,7 +674,7 @@ void DrawTriangle(const Triangle &triangle, const Matrix4x4 &vpvMatrix, uint32_t
 }
 
 // AABB正規化
-AABB Normalize(const AABB &aabb) {
+AABB NormalizeAABB(const AABB &aabb) {
 	AABB result;
 
 	result.min.x = (std::min)(aabb.min.x, aabb.max.x);
@@ -1412,6 +1417,25 @@ bool IsCollision(const OBB &obb1, const OBB &obb2) {
 	// 衝突判定
 	return true;
 }
+
+// カプセルと平面の当たり判定
+bool IsCollision(const Capsule &capsule, const Plane &plane) {
+	// 始点終点
+	Vector3 start = capsule.segment.origin;
+	Vector3 end = Add(start, capsule.segment.diff);
+
+	// 平面との距離
+	float startDistance = Dot(start, plane.normal) - plane.distance;
+	float endDistance = Dot(end, plane.normal) - plane.distance;
+
+	// 半径分考慮
+	if (fabs(startDistance) <= capsule.radius || fabs(endDistance) <= capsule.radius) {
+		return true;
+	}
+
+	// 平面を跨いだか
+	return (startDistance > 0.0f && endDistance < 0.0f) || (startDistance < 0.0f && endDistance > 0.0f);
+}
 #pragma endregion
 
 #pragma region ベジエ曲線
@@ -1475,6 +1499,14 @@ Vector3 operator-(const Vector3 &v) { return { -v.x, -v.y, -v.z }; }
 
 #pragma endregion
 
+#pragma region 物理
+// 反射ベクトル
+Vector3 Reflect(const Vector3 &input, const Vector3 &normal) {
+	return input - 2.0f * Dot(input, normal) * normal;
+}
+#pragma endregion
+
+
 static const float kWindowWidth = 1280.0f;
 static const float kWindowHeight = 720.0f;
 
@@ -1492,19 +1524,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	---------------*/
 	bool isMove = false;
 
-	// 振り子
-	ConicalPendulum conicalPendulum{
-		.anchor{0.0f, 1.0f, 0.0f},
-		.length{0.8f},
-		.halfApexAngle{0.7f},
-		.angle{0.0f},
-		.anglarVelocity{0.0f},
+	// 平面
+	Plane plane{
+		.normal{Normalize({-0.2f, 0.9f, -0.3f})},
+		.distance{ 0.0f },
 	};
 
-	// おもり
-	Sphere bob{
-		.center{0.0f, 0.0f, 0.0f},
+	// ボール
+	Ball ball{
+		.position{0.8f, 1.2f, 0.3f},
+		.mass{2.0f},
 		.radius{0.05f},
+		.color{0xFFFFFFFF},
 	};
 
 	// カメラ
@@ -1534,9 +1565,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			isMove = true;
 		}
 
-		// 数値調整
-		ImGui::SliderFloat("Length", &conicalPendulum.length, 0.0f, 1.0f);
-		ImGui::SliderFloat("HalfApexAngle", &conicalPendulum.halfApexAngle, 0.0f, 1.0f);
+		// リセット
+		if (ImGui::Button("Reset")) {
+			isMove = false;
+
+			ball = {
+				.position{0.8f, 1.2f, 0.3f},
+				.velocity = {},
+				.acceleration = {},
+				.mass{2.0f},
+				.radius{0.05f},
+				.color{0xFFFFFFFF},
+			};
+		}
 
 		ImGui::End();
 #pragma endregion
@@ -1545,22 +1586,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		---------------*/
 		float deltaTime = 1.0f / 60.0f;
 
-		// 振り子
+		// 落下開始
 		if (isMove) {
-			conicalPendulum.anglarVelocity = 
-				std::sqrt(9.8f / (conicalPendulum.length * std::cos(conicalPendulum.halfApexAngle)));
-			conicalPendulum.angle += conicalPendulum.anglarVelocity * deltaTime;
+			ball.acceleration = { 0.0f, -9.8f, 0.0f };
 		}
 
-		// 円運動の半径
-		float radius = conicalPendulum.length * std::sin(conicalPendulum.halfApexAngle);
+		// 反発係数
+		const float e = 0.8f;
 
-		// おもり
-		bob.center = {
-			conicalPendulum.anchor.x + std::cos(conicalPendulum.angle) * radius,
-			conicalPendulum.anchor.y - conicalPendulum.length,
-			conicalPendulum.anchor.z - std::sin(conicalPendulum.angle) * radius,
+		// 移動
+		ball.velocity += ball.acceleration * deltaTime;
+		ball.position += ball.velocity * deltaTime;
+
+		// カプセル化
+		Capsule capsule{
+			.segment = {
+				.origin{ball.position},
+				.diff{ball.velocity * deltaTime},
+			},
+			.radius{ball.radius},
 		};
+
+		// 衝突判定
+		if (IsCollision(capsule, plane)) {
+			float distance = Dot(ball.position, plane.normal) - plane.distance;
+			float penetration = ball.radius - distance;
+			if (penetration > 0.0f) {
+				ball.position += plane.normal * penetration;
+			}
+
+			Vector3 reflected = Reflect(ball.velocity, plane.normal);
+			Vector3 projectToNormal = Project(reflected, plane.normal);
+			Vector3 movingDirection = reflected - projectToNormal;
+			ball.velocity = projectToNormal * e + movingDirection;
+		}
 
 		/* カメラ処理
 		---------------*/
@@ -1592,18 +1651,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// グリッド
 		DrawGrid(vpvMatrix);
 
-		// 振り子
-		Vector3 pendulumScreenPoint[2];
-		pendulumScreenPoint[0] = Transform(conicalPendulum.anchor, vpvMatrix);
-		pendulumScreenPoint[1] = Transform(bob.center, vpvMatrix);
-		Novice::DrawLine(
-			static_cast<int>(pendulumScreenPoint[0].x), static_cast<int>(pendulumScreenPoint[0].y),
-			static_cast<int>(pendulumScreenPoint[1].x), static_cast<int>(pendulumScreenPoint[1].y),
-			0xFFFFFFFF
-		);
+		// 平面
+		DrawPlane(plane, viewProjectionMatrix, viewportMatrix, 0xFFFFFFFF);
 
-		// おもり
-		DrawSphere(bob, vpvMatrix, 0xFFFFFFFF);
+		// ボール
+		DrawSphere(Sphere{ ball.position, ball.radius }, vpvMatrix, ball.color);
 
 		///
 		/// ↑描画処理ここまで
